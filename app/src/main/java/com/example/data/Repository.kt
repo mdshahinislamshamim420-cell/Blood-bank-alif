@@ -160,19 +160,24 @@ class BloodConnectRepository private constructor() {
     private val _customAdTargetUrl = MutableStateFlow("https://www.affmine.com")
     val customAdTargetUrl: StateFlow<String> = _customAdTargetUrl.asStateFlow()
 
+    private val _customAdTargetCountries = MutableStateFlow("All")
+    val customAdTargetCountries: StateFlow<String> = _customAdTargetCountries.asStateFlow()
+
     fun updateCustomAdsConfig(
         context: Context,
         enabled: Boolean,
         networkName: String,
         adTitle: String,
         bannerUrl: String,
-        targetUrl: String
+        targetUrl: String,
+        targetCountries: String
     ) {
         _customAdsEnabled.value = enabled
         _customAdNetworkName.value = networkName
         _customAdTitle.value = adTitle
         _customAdBannerUrl.value = bannerUrl
         _customAdTargetUrl.value = targetUrl
+        _customAdTargetCountries.value = targetCountries
 
         val prefs = context.getSharedPreferences("blood_connect_prefs", Context.MODE_PRIVATE)
         prefs.edit().apply {
@@ -181,6 +186,7 @@ class BloodConnectRepository private constructor() {
             putString("custom_ad_title", adTitle)
             putString("custom_ad_banner_url", bannerUrl)
             putString("custom_ad_target_url", targetUrl)
+            putString("custom_ad_target_countries", targetCountries)
             apply()
         }
     }
@@ -366,6 +372,7 @@ class BloodConnectRepository private constructor() {
         _customAdTitle.value = prefs.getString("custom_ad_title", "Earn with Affmine CPA Network!") ?: "Earn with Affmine CPA Network!"
         _customAdBannerUrl.value = prefs.getString("custom_ad_banner_url", "https://images.unsplash.com/photo-1542744094-3a31f103e35f?auto=format&fit=crop&w=600&q=80") ?: "https://images.unsplash.com/photo-1542744094-3a31f103e35f?auto=format&fit=crop&w=600&q=80"
         _customAdTargetUrl.value = prefs.getString("custom_ad_target_url", "https://www.affmine.com") ?: "https://www.affmine.com"
+        _customAdTargetCountries.value = prefs.getString("custom_ad_target_countries", "All") ?: "All"
 
         prefsInitialized = true
     }
@@ -490,31 +497,35 @@ class BloodConnectRepository private constructor() {
             return true
         }
 
-        // Find existing donor if any, otherwise sign up or login dummy
-        val existing = _donors.value.find { it.phone == username || it.email == email }
+        // Find existing donor if any, otherwise return false for standard login
+        val existing = _donors.value.find { 
+            (username.isNotBlank() && it.phone == username) || (email.isNotBlank() && it.email.equals(email, ignoreCase = true))
+        }
         if (existing != null) {
             _currentUser.value = existing
             return true
         } else {
-            // Log in as a newly simulated user
-            val newSimulatedUser = BloodDonor(
-                id = "u_sim",
-                name = if (isGoogle) "Alif Shen" else "User ${username.takeLast(4)}",
-                bloodGroup = "B+",
-                phone = if (isGoogle) "01781223344" else username,
-                email = if (isGoogle) "help.alifshen.ltd@gmail.com" else email,
-                district = "Dhaka",
-                upazila = "Dhanmondi",
-                lastDonationDate = "Available",
-                isAvailable = true,
-                isApproved = true,
-                donationCount = 1,
-                isGoogleUser = isGoogle
-            )
-            _currentUser.value = newSimulatedUser
-            // Add to donor directory as approved
-            _donors.value = _donors.value + newSimulatedUser
-            return true
+            if (isGoogle) {
+                // Log in as a newly simulated user for Google Sign-in if simulated
+                val newSimulatedUser = BloodDonor(
+                    id = "u_sim",
+                    name = "Alif Shen",
+                    bloodGroup = "B+",
+                    phone = "01781223344",
+                    email = "help.alifshen.ltd@gmail.com",
+                    district = "Dhaka",
+                    upazila = "Dhanmondi",
+                    lastDonationDate = "Available",
+                    isAvailable = true,
+                    isApproved = true,
+                    donationCount = 1,
+                    isGoogleUser = true
+                )
+                _currentUser.value = newSimulatedUser
+                _donors.value = _donors.value + newSimulatedUser
+                return true
+            }
+            return false
         }
     }
 

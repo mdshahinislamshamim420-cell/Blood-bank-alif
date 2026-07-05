@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1927,6 +1928,133 @@ fun AdminSettingsTab(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
+        val activeApiUrl by viewModel.apiUrl.collectAsState()
+        val isRemoteConnected by viewModel.isRemoteConnected.collectAsState()
+        val isSyncing by viewModel.isSyncing.collectAsState()
+        val syncError by viewModel.syncError.collectAsState()
+        var editApiUrl by remember(activeApiUrl) { mutableStateOf(activeApiUrl) }
+
+        // Cloud Web API Configuration Card (Admin Only)
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp).testTag("api_sync_card_admin"),
+            colors = CardDefaults.cardColors(containerColor = AdminCardBg),
+            border = BorderStroke(1.dp, AdminBorder),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CloudSync,
+                        contentDescription = "Sync",
+                        tint = if (isRemoteConnected) AdminAccGreen else AdminAccRed,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (language == AppLanguage.ENG) "Cloud Web API Sync (Retrofit)" else "ক্লাউড এপিআই সিঙ্ক (Retrofit সেটিংস)",
+                        fontWeight = FontWeight.Bold,
+                        color = AdminAccOrange,
+                        fontSize = 15.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = if (language == AppLanguage.ENG) {
+                        "Specify a Base REST API URL to perform live uploads and sync blood requests."
+                    } else {
+                        "আপনার রক্তদাতা ও রক্ত অনুরোধের তথ্য রিমোট ডাটাবেজে লাইভ সিঙ্ক করার জন্য Base REST API URL প্রদান করুন।"
+                    },
+                    fontSize = 11.sp,
+                    color = AdminTextMuted
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = editApiUrl,
+                    onValueChange = { editApiUrl = it },
+                    label = { Text(if (language == AppLanguage.ENG) "Base API URL (HTTP/HTTPS)" else "এপিআই বেস ইউআরএল", color = AdminTextMuted, fontSize = 12.sp) },
+                    placeholder = { Text("https://myapi.example.com/api/", color = AdminTextMuted.copy(alpha = 0.5f)) },
+                    modifier = Modifier.fillMaxWidth().testTag("api_url_input_admin"),
+                    shape = RoundedCornerShape(8.dp),
+                    singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(color = AdminTextWhite),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AdminPrimaryBlue,
+                        unfocusedBorderColor = AdminBorder,
+                        focusedContainerColor = AdminDarkBg,
+                        unfocusedContainerColor = AdminDarkBg
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = {
+                            val success = viewModel.updateRemoteApiUrl(context, editApiUrl)
+                            if (success) {
+                                Toast.makeText(
+                                    context,
+                                    if (language == AppLanguage.ENG) "API base URL updated successfully!" else "এপিআই ইউআরএল আপডেট সম্পন্ন হয়েছে!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    if (language == AppLanguage.ENG) "Connection/URL formatting error!" else "ভুল ইউআরএল ফরম্যাট! অবশ্যই সঠিক হতে হবে।",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        },
+                        modifier = Modifier.weight(1f).height(42.dp).testTag("save_api_url_btn_admin"),
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isRemoteConnected) AdminAccGreen else AdminPrimaryBlue),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Filled.Link, contentDescription = "link", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(if (language == AppLanguage.ENG) "Connect API" else "সংযুক্ত করুন", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    if (isRemoteConnected) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = { viewModel.triggerRemoteSync() },
+                            modifier = Modifier.weight(1f).height(42.dp).testTag("sync_now_btn_admin"),
+                            colors = ButtonDefaults.buttonColors(containerColor = AdminAccOrange),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            if (isSyncing) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                            } else {
+                                Icon(Icons.Filled.Sync, contentDescription = "sync", modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(if (language == AppLanguage.ENG) "Sync Now" else "সিঙ্ক করুন", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                if (syncError != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = if (language == AppLanguage.ENG) "Sync Error: ${syncError}" else "ত্রুটি: ${syncError}",
+                        color = AdminAccRed,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                } else if (isRemoteConnected && !isSyncing) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = if (language == AppLanguage.ENG) "🟢 Connected. Cloud syncing is active and ready." else "🟢 রিমোট এপিআই সিঙ্ক সক্রিয় এবং ডাটাবেস প্রস্তুত।",
+                        color = AdminAccGreen,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
+
         // App Name Configuration
         Card(
             modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
@@ -2466,12 +2594,14 @@ fun AdminSettingsTab(
         val customAdTitleState by viewModel.customAdTitle.collectAsState()
         val customAdBannerUrlState by viewModel.customAdBannerUrl.collectAsState()
         val customAdTargetUrlState by viewModel.customAdTargetUrl.collectAsState()
+        val customAdTargetCountriesState by viewModel.customAdTargetCountries.collectAsState()
 
         var draftCustomAdsEnabled by remember { mutableStateOf(customAdsEnabledState) }
         var draftCustomAdNetworkName by remember { mutableStateOf(customAdNetworkNameState) }
         var draftCustomAdTitle by remember { mutableStateOf(customAdTitleState) }
         var draftCustomAdBannerUrl by remember { mutableStateOf(customAdBannerUrlState) }
         var draftCustomAdTargetUrl by remember { mutableStateOf(customAdTargetUrlState) }
+        var draftCustomAdTargetCountries by remember { mutableStateOf(customAdTargetCountriesState) }
 
         Card(
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
@@ -2566,6 +2696,17 @@ fun AdminSettingsTab(
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = AdminTextWhite),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AdminPrimaryBlue, unfocusedBorderColor = AdminBorder, focusedContainerColor = AdminDarkBg, unfocusedContainerColor = AdminDarkBg)
                     )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(if (language == AppLanguage.ENG) "Target Countries (e.g. Bangladesh, India or 'All')" else "টার্গেট দেশসমূহ (যেমন Bangladesh, India অথবা 'All')", fontSize = 11.sp, color = AdminTextMuted)
+                    OutlinedTextField(
+                        value = draftCustomAdTargetCountries,
+                        onValueChange = { draftCustomAdTargetCountries = it },
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = AdminTextWhite),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AdminPrimaryBlue, unfocusedBorderColor = AdminBorder, focusedContainerColor = AdminDarkBg, unfocusedContainerColor = AdminDarkBg)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -2578,7 +2719,8 @@ fun AdminSettingsTab(
                             draftCustomAdNetworkName,
                             draftCustomAdTitle,
                             draftCustomAdBannerUrl,
-                            draftCustomAdTargetUrl
+                            draftCustomAdTargetUrl,
+                            draftCustomAdTargetCountries
                         )
                         Toast.makeText(context, "Affiliate Ads Config Saved!", Toast.LENGTH_SHORT).show()
                     },

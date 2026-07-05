@@ -1098,7 +1098,26 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
     val appName by viewModel.appName.collectAsState()
     val context = LocalContext.current
     val showRegTab by viewModel.showRegistrationTab.collectAsState()
-    var isLoginTab by remember(showRegTab) { mutableStateOf(!showRegTab) }
+    var regRoleInput by remember { mutableStateOf("Donor") } // "Donor" or "Requester"
+    var selectedTab by remember(showRegTab) {
+        mutableStateOf(
+            if (showRegTab) {
+                if (regRoleInput == "Requester") 1 else 2
+            } else {
+                0
+            }
+        )
+    }
+
+    // Sync regRoleInput when selectedTab changes to 1 or 2
+    androidx.compose.runtime.LaunchedEffect(selectedTab) {
+        if (selectedTab == 1) {
+            regRoleInput = "Requester"
+        } else if (selectedTab == 2) {
+            regRoleInput = "Donor"
+        }
+    }
+
     var loginMethodIsEmail by remember { mutableStateOf(true) }
     val isUserInBangladesh by viewModel.isUserInBangladesh.collectAsState()
 
@@ -1115,7 +1134,6 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
     var regDistrictInput by remember { mutableStateOf("") }
     var regUpazilaInput by remember { mutableStateOf("") }
     var regLastDonationInput by remember { mutableStateOf("Never") }
-    var regRoleInput by remember { mutableStateOf("Donor") } // "Donor" or "Requester"
     val initialDetectedCountry = viewModel.detectedCountry.value
     var regCountryInput by remember { mutableStateOf(initialDetectedCountry) }
 
@@ -1188,7 +1206,7 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
 
         Spacer(modifier = Modifier.height(30.dp))
 
-        // Tab Row Switcher
+        // Tab Row Switcher (3 options)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1196,39 +1214,69 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
                 .padding(4.dp)
         ) {
             Button(
-                onClick = { isLoginTab = true },
+                onClick = { selectedTab = 0 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isLoginTab) BloodRed else Color.Transparent,
-                    contentColor = if (isLoginTab) Color.White else DarkText
+                    containerColor = if (selectedTab == 0) BloodRed else Color.Transparent,
+                    contentColor = if (selectedTab == 0) Color.White else DarkText
                 ),
                 shape = RoundedCornerShape(25.dp),
                 modifier = Modifier
                     .weight(1f)
                     .testTag("tab_login"),
-                contentPadding = PaddingValues(vertical = 12.dp)
+                contentPadding = PaddingValues(vertical = 10.dp)
             ) {
-                Text(text = strings["login_title"] ?: "Sign In", fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (language == AppLanguage.BAN) "লগ ইন" else "Sign In",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    maxLines = 1
+                )
             }
 
             Button(
-                onClick = { isLoginTab = false },
+                onClick = { selectedTab = 1 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (!isLoginTab) BloodRed else Color.Transparent,
-                    contentColor = if (!isLoginTab) Color.White else DarkText
+                    containerColor = if (selectedTab == 1) BloodRed else Color.Transparent,
+                    contentColor = if (selectedTab == 1) Color.White else DarkText
                 ),
                 shape = RoundedCornerShape(25.dp),
                 modifier = Modifier
-                    .weight(1f)
-                    .testTag("tab_register"),
-                contentPadding = PaddingValues(vertical = 12.dp)
+                    .weight(1.2f)
+                    .testTag("tab_register_seeker"),
+                contentPadding = PaddingValues(vertical = 10.dp)
             ) {
-                Text(text = strings["btn_register"] ?: "Become Donor", fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (language == AppLanguage.BAN) "রক্ত গ্রহীতা" else "Blood Seeker",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    maxLines = 1
+                )
+            }
+
+            Button(
+                onClick = { selectedTab = 2 },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (selectedTab == 2) BloodRed else Color.Transparent,
+                    contentColor = if (selectedTab == 2) Color.White else DarkText
+                ),
+                shape = RoundedCornerShape(25.dp),
+                modifier = Modifier
+                    .weight(1.1f)
+                    .testTag("tab_register_donor"),
+                contentPadding = PaddingValues(vertical = 10.dp)
+            ) {
+                Text(
+                    text = if (language == AppLanguage.BAN) "রক্তদাতা" else "Join Donor",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    maxLines = 1
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        if (isLoginTab) {
+        if (selectedTab == 0) {
             // LOGIN FORM
             if (loginMethodIsEmail) {
                 OutlinedTextField(
@@ -1302,7 +1350,14 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
                     } else {
                         viewModel.loginPhone = if (loginMethodIsEmail) "" else phoneInput
                         viewModel.loginEmail = if (loginMethodIsEmail) emailInput else ""
-                        viewModel.triggerLogin(isGoogle = false)
+                        val loginSuccess = viewModel.triggerLogin(isGoogle = false)
+                        if (!loginSuccess) {
+                            Toast.makeText(
+                                context,
+                                if (language == AppLanguage.BAN) "লগইন ব্যর্থ হয়েছে! এই ইমেইল বা ফোন নম্বরটি নিবন্ধিত নয়।" else "Login failed! This email or phone is not registered.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                     }
                 },
                 modifier = Modifier
@@ -1336,7 +1391,7 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
                     color = BloodRed,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    modifier = Modifier.clickable { isLoginTab = false }
+                    modifier = Modifier.clickable { selectedTab = 2 }
                 )
             }
 
@@ -1365,74 +1420,17 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
         } else {
             // REGISTER FORM
             Text(
-                text = if (language == AppLanguage.BAN) "আপনার অ্যাকাউন্ট ক্যাটাগরি বেছে নিন" else "Choose Account Category",
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = BloodRed,
-                modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
+                text = if (selectedTab == 1) {
+                    if (language == AppLanguage.BAN) "রক্ত গ্রহীতা (Seeker) হিসেবে নিবন্ধন" else "Register as Blood Seeker"
+                } else {
+                    if (language == AppLanguage.BAN) "রক্তদাতা (Donor) হিসেবে যোগ দিন" else "Join as Blood Donor"
+                },
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = BloodRed
+                ),
+                modifier = Modifier.padding(bottom = 16.dp).align(Alignment.Start)
             )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White, RoundedCornerShape(12.dp))
-                    .border(1.dp, LightBorder, RoundedCornerShape(12.dp))
-                    .padding(4.dp)
-            ) {
-                Button(
-                    onClick = { regRoleInput = "Donor" },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (regRoleInput == "Donor") BloodRed else Color.Transparent,
-                        contentColor = if (regRoleInput == "Donor") Color.White else DarkText
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("reg_role_donor"),
-                    contentPadding = PaddingValues(vertical = 12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Bloodtype,
-                        contentDescription = "Donor",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (language == AppLanguage.BAN) "ডোনার (রক্তদাতা)" else "Donor",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(4.dp))
-
-                Button(
-                    onClick = { regRoleInput = "Requester" },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (regRoleInput == "Requester") BloodRed else Color.Transparent,
-                        contentColor = if (regRoleInput == "Requester") Color.White else DarkText
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("reg_role_requester"),
-                    contentPadding = PaddingValues(vertical = 12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.HealthAndSafety,
-                        contentDescription = "Blood Requester",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (language == AppLanguage.BAN) "রক্ত গ্রহীতা" else "Blood Seeker",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
                 value = regNameInput,
@@ -1869,76 +1867,29 @@ fun HomeScreen(viewModel: MainViewModel) {
             onDismissRequest = { showCountryChangeDialog = false },
             title = {
                 Text(
-                    text = if (isBn) "দেশ/লোকেশন পরিবর্তন করুন" else "Change Country/Region",
+                    text = if (isBn) "সার্ভার সংযোগ নোটিশ" else "Server Connection Notice",
                     fontWeight = FontWeight.Bold,
                     color = BloodRed,
                     fontSize = 18.sp
                 )
             },
             text = {
-                Column {
-                    Text(
-                        text = if (isBn) {
-                            "ক্লাউড হোস্টিং এমুলেটরে থাকার কারণে এটি আমেরিকাকে ডিফল্ট লোকেশন হিসেবে সিলেক্ট করেছে। ম্যানুয়ালি বাংলাদেশ সেট করতে নিচের অপশনে চাপুন:"
-                        } else {
-                            "Due to cloud hosting, United States was automatically detected as the system locale. You can manually force Bangladesh or another country below:"
-                        },
-                        fontSize = 12.sp,
-                        color = Color.DarkGray,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    
-                    LazyColumn(modifier = Modifier.heightIn(max = 240.dp)) {
-                        items(quickCountries.size) { index ->
-                            val (ctyName, ctyCode) = quickCountries[index]
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        viewModel.setDetectedCountry(ctyName, ctyCode)
-                                        showCountryChangeDialog = false
-                                        android.widget.Toast.makeText(
-                                            context,
-                                            if (isBn) "রিয়েলটাইম দেশ পরিবর্তন করে $ctyName করা হয়েছে!" else "Country locked to $ctyName!",
-                                            android.widget.Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                    .padding(vertical = 12.dp, horizontal = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                val flag = try {
-                                    val firstChar = Character.codePointAt(ctyCode.uppercase(), 0) - 0x41 + 0x1F1E6
-                                    val secondChar = Character.codePointAt(ctyCode.uppercase(), 1) - 0x41 + 0x1F1E6
-                                    String(Character.toChars(firstChar)) + String(Character.toChars(secondChar))
-                                } catch (e: Exception) {
-                                    "🌐"
-                                }
-                                Text(flag, fontSize = 20.sp)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = ctyName,
-                                    fontSize = 14.sp,
-                                    color = Color.Black,
-                                    fontWeight = if (detectedCountry == ctyName) FontWeight.Bold else FontWeight.Normal
-                                )
-                                if (detectedCountry == ctyName) {
-                                    Spacer(modifier = Modifier.weight(1f))
-                                    Icon(
-                                        imageVector = Icons.Filled.Check,
-                                        contentDescription = "Selected",
-                                        tint = Color(0xFF2E7D32),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-                            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
-                        }
-                    }
-                }
+                Text(
+                    text = if (isBn) {
+                        "আপনি যে দেশ থেকে অ্যাপটি ওপেন করেছেন, আপনার ডিভাইসটি স্বয়ংক্রিয়ভাবে সেই দেশের লোকাল ব্লাড ডাটাবেজ সার্ভারের সাথে সংযুক্ত হয়েছে। নিরাপত্তাজনিত কারণে আপনি অন্য দেশের সার্ভারে পরিবর্তন বা প্রবেশ করতে পারবেন না।"
+                    } else {
+                        "Your device has been automatically connected to the local blood database server for your region. For security reasons, switching or entering other country servers is not permitted."
+                    },
+                    fontSize = 14.sp,
+                    color = Color.DarkGray
+                )
             },
             confirmButton = {
-                TextButton(onClick = { showCountryChangeDialog = false }) {
-                    Text(if (isBn) "বন্ধ করুন" else "Close", color = Color.Gray)
+                TextButton(
+                    onClick = { showCountryChangeDialog = false },
+                    modifier = Modifier.testTag("ok_server_notice_btn")
+                ) {
+                    Text(if (isBn) "ওকে" else "OK", color = BloodRed, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -2719,7 +2670,14 @@ fun HomeScreen(viewModel: MainViewModel) {
 
         // Custom CPA/Affiliate banner ad (Affmine, etc.)
         val customAdsEnabled by viewModel.customAdsEnabled.collectAsState()
-        if (customAdsEnabled) {
+        val customAdTargetCountries by viewModel.customAdTargetCountries.collectAsState()
+
+        val isAdAllowedInCountry = remember(customAdTargetCountries, detectedCountry) {
+            val countries = customAdTargetCountries.split(",").map { it.trim() }
+            countries.any { it.equals("All", ignoreCase = true) || it.equals(detectedCountry, ignoreCase = true) }
+        }
+
+        if (customAdsEnabled && isAdAllowedInCountry) {
             val customAdNetworkName by viewModel.customAdNetworkName.collectAsState()
             val customAdTitle by viewModel.customAdTitle.collectAsState()
             val customAdBannerUrl by viewModel.customAdBannerUrl.collectAsState()
@@ -6944,150 +6902,6 @@ fun UserProfileScreen(viewModel: MainViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // CLOUD WEB API COLLAPSIBLE INTEGRATION SETTINGS CARD
-        var showApiSetup by remember { mutableStateOf(false) }
-        val activeApiUrl by viewModel.apiUrl.collectAsState()
-        val isRemoteConnected by viewModel.isRemoteConnected.collectAsState()
-        val isSyncing by viewModel.isSyncing.collectAsState()
-        val syncError by viewModel.syncError.collectAsState()
-        val isBangla = language == AppLanguage.BAN
-        
-        var editApiUrl by remember(activeApiUrl) { mutableStateOf(activeApiUrl) }
-
-        Card(
-            modifier = Modifier.fillMaxWidth().testTag("api_sync_card"),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().clickable { showApiSetup = !showApiSetup },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.CloudSync,
-                        contentDescription = "Sync",
-                        tint = if (isRemoteConnected) Color(0xFF2E7D32) else BloodRed,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (isBangla) "ক্লাউড এপিআই সিঙ্ক (Retrofit সেটিংস)" else "Cloud Web API Sync (Retrofit)",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                        Text(
-                            text = if (isRemoteConnected) {
-                                if (isBangla) "সংযুক্ত: $activeApiUrl" else "Connected: $activeApiUrl"
-                            } else {
-                                if (isBangla) "এনভায়রনমেন্ট: লোকাল অফলাইন মোড" else "Mode: Standalone Offline Mode"
-                            },
-                            fontSize = 11.sp,
-                            color = if (isRemoteConnected) Color(0xFF2E7D32) else Color.Gray,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Icon(
-                        imageVector = if (showApiSetup) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                        contentDescription = "toggle"
-                    )
-                }
-
-                if (showApiSetup) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = if (isBangla) {
-                            "আপনার রক্তদাতা ও রক্ত অনুরোধের তথ্য রিমোট ডাটাবেজে লাইভ সিঙ্ক করার জন্য Base REST API URL প্রদান করুন।"
-                        } else {
-                            "Specify a Base REST API URL (e.g. your PHP, Suppabase or Node.js backend) to perform live uploads and sync blood requests."
-                        },
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = editApiUrl,
-                        onValueChange = { editApiUrl = it },
-                        label = { Text(if (isBangla) "এপিআই বেস ইউআরএল (HTTP/HTTPS)" else "Base API URL (HTTP/HTTPS)") },
-                        placeholder = { Text("https://myapi.example.com/api/") },
-                        modifier = Modifier.fillMaxWidth().testTag("api_url_input"),
-                        shape = RoundedCornerShape(10.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Button(
-                            onClick = {
-                                val success = viewModel.updateRemoteApiUrl(context, editApiUrl)
-                                if (success) {
-                                    Toast.makeText(
-                                        context,
-                                        if (isBangla) "এপিআই ইউআরএল আপডেট সম্পন্ন হয়েছে!" else "API base URL updated successfully!",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                } else {
-                                    Toast.makeText(
-                                        context,
-                                        if (isBangla) "ভুল ইউআরএল ফরম্যাট! অবশ্যই সঠিক হতে হবে।" else "Connection/URL formatting error!",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                            },
-                            modifier = Modifier.weight(1f).testTag("save_api_url_btn"),
-                            colors = ButtonDefaults.buttonColors(containerColor = if (isRemoteConnected) Color(0xFF2E7D32) else BloodRed),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Icon(Icons.Filled.Link, contentDescription = "link", modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(if (isBangla) "সংযুক্ত করুন" else "Connect API", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        if (isRemoteConnected) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            FilledTonalButton(
-                                onClick = { viewModel.triggerRemoteSync() },
-                                modifier = Modifier.weight(1f).testTag("sync_now_btn"),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                if (isSyncing) {
-                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                } else {
-                                    Icon(Icons.Filled.Sync, contentDescription = "sync", modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(if (isBangla) "সিঙ্ক করুন" else "Sync Now", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-
-                    if (syncError != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = if (isBangla) "ত্রুটি: ${syncError}" else "Sync Error: ${syncError}",
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    } else if (isRemoteConnected && !isSyncing) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = if (isBangla) "🟢 রিমোট এপিআই সিঙ্ক সক্রিয় এবং ডাটাবেস প্রস্তুত।" else "🟢 Connected. Cloud syncing is active and ready.",
-                            color = Color(0xFF2E7D32),
-                            fontSize = 11.sp
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
         Button(
             onClick = {
                 viewModel.profileEditName = editName
@@ -7218,246 +7032,255 @@ fun AdminDashboardScreen(viewModel: MainViewModel) {
     val novusHeaderBg = Color.White
     val novusBorder = Color(0xFFE5E7EB)
 
-    Row(
+    var showMenuDropdown by remember { mutableStateOf(false) }
+
+    val adminMenus = listOf(
+        Triple("DASHBOARD", if (language == AppLanguage.ENG) "Dashboard" else "ড্যাশবোর্ড", Icons.Default.Dashboard),
+        Triple("DONORS", if (language == AppLanguage.ENG) "Donors List" else "রক্তদাতা তালিকা", Icons.Default.Person),
+        Triple("REQUESTS", if (language == AppLanguage.ENG) "Blood Requests" else "রক্তের অনুরোধসমূহ", Icons.Default.Favorite),
+        Triple("SUPPORT", if (language == AppLanguage.ENG) "Live Support" else "লাইভ সাপোর্ট", Icons.Default.Chat),
+        Triple("POLICIES", if (language == AppLanguage.ENG) "Page Policies" else "পৃষ্ঠা নীতিসমূহ", Icons.Default.List),
+        Triple("REPORTS", if (language == AppLanguage.ENG) "Fraud Reports" else "প্রতারণা রিপোর্ট", Icons.Default.Warning),
+        Triple("SETTINGS", if (language == AppLanguage.ENG) "System Config" else "সিস্টেম কনফিগ", Icons.Default.Settings)
+    )
+
+    val currentMenu = adminMenus.find { it.first == activeTab } ?: adminMenus[0]
+    val remainingMenus = adminMenus.filter { it.first != activeTab }
+
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(novusBg)
     ) {
-        // --- 1. LEFT SIDEBAR (NOVUS style) ---
-        Column(
+        // --- NEW DYNAMIC HEADER WITH DROPDOWN FOR REMAINING MENUS ---
+        Row(
             modifier = Modifier
-                .width(220.dp)
-                .fillMaxHeight()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(novusSidebarBg, novusSidebarDark)
-                    )
-                )
-                .padding(vertical = 16.dp, horizontal = 12.dp)
+                .fillMaxWidth()
+                .background(Brush.horizontalGradient(listOf(novusSidebarBg, novusSidebarDark)))
+                .height(64.dp)
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Brand Logo Header
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp, start = 8.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+            // Left: Logo & Exit button
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { viewModel.navigateTo(AppScreen.HOME) },
+                    modifier = Modifier.size(36.dp).testTag("exit_admin_portal_btn")
                 ) {
                     Icon(
-                        imageVector = Icons.Default.AdminPanelSettings,
-                        contentDescription = "Logo",
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Exit Portal",
                         tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "NOVUS",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White,
-                        letterSpacing = 1.sp
-                    )
-                }
-                Text(
-                    text = "A d m i n P a n e l",
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.padding(start = 2.dp)
-                )
-            }
-
-            // Menu Items with badges
-            val sidebarMenus = listOf(
-                Triple("DASHBOARD", "Dashboard", Icons.Default.Dashboard),
-                Triple("DONORS", "Donors List", Icons.Default.Person),
-                Triple("REQUESTS", "Blood Requests", Icons.Default.Favorite),
-                Triple("SUPPORT", "Live Support", Icons.Default.Chat),
-                Triple("POLICIES", "Page Policies", Icons.Default.List),
-                Triple("REPORTS", "Fraud Reports", Icons.Default.Warning),
-                Triple("SETTINGS", "System Config", Icons.Default.Settings)
-            )
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                sidebarMenus.forEach { (tag, label, icon) ->
-                    val isSelected = activeTab == tag
-                    
-                    // Badge details
-                    val badgeValue = when (tag) {
-                        "DONORS" -> "${donorsList.size}"
-                        "REQUESTS" -> "${requestsList.filter { it.status == "Active" }.size}"
-                        "REPORTS" -> "${scamReportsList.size}"
-                        else -> null
-                    }
-                    val badgeColor = when (tag) {
-                        "DONORS" -> Color(0xFF00BCD4) // Soft Cyan
-                        "REQUESTS" -> Color(0xFF8BC34A) // Green
-                        "REPORTS" -> Color(0xFFFF5722) // Orange
-                        else -> Color.Transparent
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) novusSidebarActive else Color.Transparent)
-                            .clickable {
-                                activeTab = tag
-                                filterStatus = "All"
-                            }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.7f),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = label,
-                            color = if (isSelected) Color.White else Color.White.copy(alpha = 0.8f),
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 12.sp,
-                            modifier = Modifier.weight(1f)
-                        )
-                        
-                        if (badgeValue != null) {
-                            Box(
-                                modifier = Modifier
-                                    .background(badgeColor, RoundedCornerShape(10.dp))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = badgeValue,
-                                    color = Color.White,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Quick Toggle Back to Main Home Applet
-            Button(
-                onClick = { viewModel.navigateTo(AppScreen.HOME) },
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.15f)),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Exit", tint = Color.White, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = if (language == AppLanguage.ENG) "Exit Portal" else "বাইরে যান",
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
-        // --- 2. MAIN WORKSPACE CONTENT ---
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-        ) {
-            // Top Header Nav Bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp)
-                    .background(novusHeaderBg)
-                    .border(1.dp, novusBorder)
-                    .padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Collapse",
-                        tint = Color.Gray,
                         modifier = Modifier.size(20.dp)
                     )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    
-                    // Top Search input box
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.AdminPanelSettings,
+                            contentDescription = "Admin",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "NOVUS",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                    Text(
+                        text = if (language == AppLanguage.ENG) "Admin Panel" else "এডমিন প্যানেল",
+                        fontSize = 8.sp,
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Center: ACTIVE MENU CHIP & DYNAMIC THREE-DOTS MENU
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    imageVector = currentMenu.third,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = currentMenu.second,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+
+                // Current menu badge value
+                val currentBadgeValue = when (currentMenu.first) {
+                    "DONORS" -> "${donorsList.size}"
+                    "REQUESTS" -> "${requestsList.filter { it.status == "Active" }.size}"
+                    "REPORTS" -> "${scamReportsList.size}"
+                    else -> null
+                }
+                if (currentBadgeValue != null) {
+                    Spacer(modifier = Modifier.width(6.dp))
                     Box(
                         modifier = Modifier
-                            .width(220.dp)
-                            .background(Color(0xFFF3F4F6), RoundedCornerShape(4.dp))
-                            .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                            .background(Color(0xFFE53935), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Search, "search", tint = Color.Gray, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            androidx.compose.foundation.text.BasicTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.DarkGray),
-                                modifier = Modifier.fillMaxWidth()
+                        Text(
+                            text = currentBadgeValue,
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+                Box {
+                    IconButton(
+                        onClick = { showMenuDropdown = true },
+                        modifier = Modifier.size(24.dp).testTag("three_dots_menu_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "More Menus",
+                            tint = Color.White
+                        )
+                    }
+
+                    // Dropdown for the remaining (inactive) menus
+                    DropdownMenu(
+                        expanded = showMenuDropdown,
+                        onDismissRequest = { showMenuDropdown = false },
+                        modifier = Modifier
+                            .background(Color(0xFF1E2230)) // Dark Theme Matching
+                            .border(1.dp, Color(0xFF2C3248), RoundedCornerShape(8.dp))
+                            .testTag("admin_more_dropdown")
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.ENG) "Switch Admin Section" else "অন্যান্য মেনুসমূহ",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF8F9BB3),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                        HorizontalDivider(color = Color(0xFF2C3248))
+
+                        remainingMenus.forEach { (tag, label, icon) ->
+                            val badgeValue = when (tag) {
+                                "DONORS" -> "${donorsList.size}"
+                                "REQUESTS" -> "${requestsList.filter { it.status == "Active" }.size}"
+                                "REPORTS" -> "${scamReportsList.size}"
+                                else -> null
+                            }
+                            val badgeColor = when (tag) {
+                                "DONORS" -> Color(0xFF00BCD4)
+                                "REQUESTS" -> Color(0xFF8BC34A)
+                                "REPORTS" -> Color(0xFFFF5722)
+                                else -> Color.Transparent
+                            }
+
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            tint = Color.White.copy(alpha = 0.8f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = label,
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        if (badgeValue != null) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(badgeColor, RoundedCornerShape(10.dp))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = badgeValue,
+                                                    color = Color.White,
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    activeTab = tag
+                                    filterStatus = "All"
+                                    showMenuDropdown = false
+                                }
                             )
                         }
                     }
                 }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Quick Notification Badges
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(contentAlignment = Alignment.TopEnd) {
-                            Icon(Icons.Default.Mail, "mail", tint = Color.Gray, modifier = Modifier.size(18.dp))
-                            Box(modifier = Modifier.size(6.dp).background(Color(0xFF4F46E5), CircleShape))
-                        }
-                        Box(contentAlignment = Alignment.TopEnd) {
-                            Icon(Icons.Default.Notifications, "notif", tint = Color.Gray, modifier = Modifier.size(18.dp))
-                            Box(modifier = Modifier.size(6.dp).background(Color(0xFFFF5722), CircleShape))
-                        }
-                    }
-
-                    // Admin User summary
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(20.dp))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .background(Color(0xFFE0E0E0), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("A", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.DarkGray)
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Column {
-                            Text("Vikela", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.DarkGray)
-                            Text("Administrator", fontSize = 8.sp, color = Color.Gray)
-                        }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(Icons.Default.ArrowDropDown, "down", tint = Color.Gray, modifier = Modifier.size(14.dp))
-                    }
-                }
             }
 
-            // Inner Tab/Workspace View
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
+            // Right: Interactive Search Input & Small Admin Avatar
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // Search box
+                Box(
+                    modifier = Modifier
+                        .width(120.dp)
+                        .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Search, "search", tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White),
+                            cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.White),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                // Profile Badge
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(Color.White.copy(alpha = 0.2f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("A", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+        }
+
+        // --- 2. MAIN WORKSPACE CONTENT ---
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
                 if (activeTab == "DASHBOARD") {
                     // --- NOVUS DASHBOARD CONTENT VIEW ---
                     Column(
@@ -8097,7 +7920,6 @@ fun AdminDashboardScreen(viewModel: MainViewModel) {
                                     )
                                 }
                             }
-                        }
                     }
                 }
             }

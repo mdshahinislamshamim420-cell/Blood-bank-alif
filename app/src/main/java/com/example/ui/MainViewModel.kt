@@ -120,6 +120,7 @@ class MainViewModel(
     val customAdTitle: StateFlow<String> = repository.customAdTitle
     val customAdBannerUrl: StateFlow<String> = repository.customAdBannerUrl
     val customAdTargetUrl: StateFlow<String> = repository.customAdTargetUrl
+    val customAdTargetCountries: StateFlow<String> = repository.customAdTargetCountries
 
     fun updateCustomAdsConfig(
         context: android.content.Context,
@@ -127,9 +128,10 @@ class MainViewModel(
         networkName: String,
         adTitle: String,
         bannerUrl: String,
-        targetUrl: String
+        targetUrl: String,
+        targetCountries: String
     ) {
-        repository.updateCustomAdsConfig(context, enabled, networkName, adTitle, bannerUrl, targetUrl)
+        repository.updateCustomAdsConfig(context, enabled, networkName, adTitle, bannerUrl, targetUrl, targetCountries)
     }
 
     fun updateAdMobConfig(
