@@ -399,7 +399,7 @@ class MainViewModel(
             } else {
                 (upz == "All" || donor.upazila.equals(upz, ignoreCase = true))
             }
-            matchGroup && matchDist && matchUpz && donor.isApproved && donor.isAvailable
+            matchGroup && matchDist && matchUpz && donor.isApproved && donor.isAvailable && donor.role == "Donor"
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -464,6 +464,7 @@ class MainViewModel(
     var profileEditLastDonation = ""
     var profileEditAvailable = true
     var profileEditCountry = "Bangladesh"
+    var profileEditRole = "Donor"
 
     // Request form states
     var reqPatientName = ""
@@ -488,6 +489,7 @@ class MainViewModel(
     var regUpazila = "Mirpur"
     var regLastDonation = "Never"
     var regCountry = "Bangladesh"
+    var regRole = "Donor"
 
     // Ambulance form states
     var ambOwnerName = ""
@@ -526,7 +528,8 @@ class MainViewModel(
             district = regDistrict,
             upazila = regUpazila,
             lastDonationDate = regLastDonation,
-            country = regCountry
+            country = regCountry,
+            role = regRole
         )
         // Login session auto sets
         val user = repository.currentUser.value
@@ -547,6 +550,7 @@ class MainViewModel(
         profileEditLastDonation = user.lastDonationDate
         profileEditAvailable = user.isAvailable
         profileEditCountry = user.country
+        profileEditRole = user.role
     }
 
     fun triggerUpdateProfile() {
@@ -559,7 +563,8 @@ class MainViewModel(
             upazila = profileEditUpazila,
             lastDonation = profileEditLastDonation,
             available = profileEditAvailable,
-            country = profileEditCountry
+            country = profileEditCountry,
+            role = profileEditRole
         )
     }
 

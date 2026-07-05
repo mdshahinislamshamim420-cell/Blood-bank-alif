@@ -119,12 +119,26 @@ val keystoreFile = file("${rootDir}/debug.keystore")
 val base64File = file("${rootDir}/debug.keystore.base64")
 if (!keystoreFile.exists() && base64File.exists()) {
   try {
-    val base64Content = base64File.readText().trim()
+    val base64Content = base64File.readText().trim().replace("\\s".toRegex(), "")
     val decodedBytes = Base64.getDecoder().decode(base64Content)
     keystoreFile.writeBytes(decodedBytes)
     println("SUCCESS: Decoded debug.keystore from base64 at configuration time.")
   } catch (e: Exception) {
     println("ERROR: Failed to decode debug.keystore: ${e.message}")
+  }
+}
+
+// Decode my-upload-key.jks from my-upload-key.jks.base64 if it does not exist
+val uploadKeystoreFile = file("${rootDir}/my-upload-key.jks")
+val uploadBase64File = file("${rootDir}/my-upload-key.jks.base64")
+if (!uploadKeystoreFile.exists() && uploadBase64File.exists()) {
+  try {
+    val base64Content = uploadBase64File.readText().trim().replace("\\s".toRegex(), "")
+    val decodedBytes = Base64.getDecoder().decode(base64Content)
+    uploadKeystoreFile.writeBytes(decodedBytes)
+    println("SUCCESS: Decoded my-upload-key.jks from base64 at configuration time.")
+  } catch (e: Exception) {
+    println("ERROR: Failed to decode my-upload-key.jks: ${e.message}")
   }
 }
 

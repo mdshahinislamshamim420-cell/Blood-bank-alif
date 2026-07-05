@@ -1115,6 +1115,7 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
     var regDistrictInput by remember { mutableStateOf("") }
     var regUpazilaInput by remember { mutableStateOf("") }
     var regLastDonationInput by remember { mutableStateOf("Never") }
+    var regRoleInput by remember { mutableStateOf("Donor") } // "Donor" or "Requester"
     val initialDetectedCountry = viewModel.detectedCountry.value
     var regCountryInput by remember { mutableStateOf(initialDetectedCountry) }
 
@@ -1363,6 +1364,76 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
             }
         } else {
             // REGISTER FORM
+            Text(
+                text = if (language == AppLanguage.BAN) "আপনার অ্যাকাউন্ট ক্যাটাগরি বেছে নিন" else "Choose Account Category",
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = BloodRed,
+                modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White, RoundedCornerShape(12.dp))
+                    .border(1.dp, LightBorder, RoundedCornerShape(12.dp))
+                    .padding(4.dp)
+            ) {
+                Button(
+                    onClick = { regRoleInput = "Donor" },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (regRoleInput == "Donor") BloodRed else Color.Transparent,
+                        contentColor = if (regRoleInput == "Donor") Color.White else DarkText
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("reg_role_donor"),
+                    contentPadding = PaddingValues(vertical = 12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Bloodtype,
+                        contentDescription = "Donor",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (language == AppLanguage.BAN) "ডোনার (রক্তদাতা)" else "Donor",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                Button(
+                    onClick = { regRoleInput = "Requester" },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (regRoleInput == "Requester") BloodRed else Color.Transparent,
+                        contentColor = if (regRoleInput == "Requester") Color.White else DarkText
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("reg_role_requester"),
+                    contentPadding = PaddingValues(vertical = 12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.HealthAndSafety,
+                        contentDescription = "Blood Requester",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (language == AppLanguage.BAN) "রক্ত গ্রহীতা" else "Blood Seeker",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             OutlinedTextField(
                 value = regNameInput,
                 onValueChange = { regNameInput = it },
@@ -1592,19 +1663,23 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            OutlinedTextField(
-                value = regLastDonationInput,
-                onValueChange = { regLastDonationInput = it },
-                label = { Text(strings["last_donation_label"] ?: "Last Donation Date") },
-                placeholder = { Text(strings["last_donation_placeholder"] ?: "e.g. 2026-03-10 or Never") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("reg_last_donation_input"),
-                shape = RoundedCornerShape(12.dp),
-                leadingIcon = { Icon(Icons.Filled.CalendarMonth, contentDescription = "Calendar") }
-            )
+            if (regRoleInput == "Donor") {
+                OutlinedTextField(
+                    value = regLastDonationInput,
+                    onValueChange = { regLastDonationInput = it },
+                    label = { Text(strings["last_donation_label"] ?: "Last Donation Date") },
+                    placeholder = { Text(strings["last_donation_placeholder"] ?: "e.g. 2026-03-10 or Never") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("reg_last_donation_input"),
+                    shape = RoundedCornerShape(12.dp),
+                    leadingIcon = { Icon(Icons.Filled.CalendarMonth, contentDescription = "Calendar") }
+                )
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp))
+            } else {
+                Spacer(modifier = Modifier.height(12.dp))
+            }
 
             Button(
                 onClick = {
@@ -1617,12 +1692,18 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
                         viewModel.regBloodGroup = regBloodInput
                         viewModel.regDistrict = regDistrictInput
                         viewModel.regUpazila = regUpazilaInput
-                        viewModel.regLastDonation = regLastDonationInput
+                        viewModel.regLastDonation = if (regRoleInput == "Donor") regLastDonationInput else "N/A"
                         viewModel.regCountry = regCountryInput
+                        viewModel.regRole = regRoleInput
 
                         val ok = viewModel.triggerSignup()
                         if (ok) {
-                            Toast.makeText(context, strings["msg_donor_registered"], Toast.LENGTH_LONG).show()
+                            val successMsg = if (regRoleInput == "Donor") {
+                                strings["msg_donor_registered"] ?: "Registered and logged in as donor successfully!"
+                            } else {
+                                if (language == AppLanguage.BAN) "রক্ত গ্রহীতা হিসেবে সফলভাবে নিবন্ধিত হয়েছেন!" else "Registered and logged in as Blood Requester successfully!"
+                            }
+                            Toast.makeText(context, successMsg, Toast.LENGTH_LONG).show()
                         }
                     }
                 },
@@ -6478,8 +6559,12 @@ fun UserProfileScreen(viewModel: MainViewModel) {
                 Column {
                     Text(text = finalUser.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Text(text = "User ID: ${finalUser.displayUserId}", color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(text = if (language == AppLanguage.BAN) "পদবী: গোল্ডেন ডোনার" else "Rank: Golden Blood Donor", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
-                    Text(text = if (language == AppLanguage.BAN) "সর্বমোট রক্তদান: ${finalUser.donationCount} বার" else "Total Donations: ${finalUser.donationCount} Times", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    if (finalUser.role == "Requester") {
+                        Text(text = if (language == AppLanguage.BAN) "ভূমিকা: রক্ত গ্রহীতা (Seeker)" else "Role: Blood Seeker", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                    } else {
+                        Text(text = if (language == AppLanguage.BAN) "পদবী: গোল্ডেন ডোনার" else "Rank: Golden Blood Donor", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                        Text(text = if (language == AppLanguage.BAN) "সর্বমোট রক্তদান: ${finalUser.donationCount} বার" else "Total Donations: ${finalUser.donationCount} Times", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
@@ -6487,37 +6572,76 @@ fun UserProfileScreen(viewModel: MainViewModel) {
         Spacer(modifier = Modifier.height(16.dp))
 
         // ACCORDION QUICK ACTIONS
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = LightPinkRed),
-            border = BorderStroke(1.dp, CoralRed)
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Text(
-                    text = "Did you donate blood recently? 🩸",
-                    fontWeight = FontWeight.Bold,
-                    color = DarkBloodRed,
-                    fontSize = 14.sp
-                )
-                Text(
-                    text = "Increment your live counter to notify hospitals of availability dates.",
-                    fontSize = 12.sp,
-                    color = DarkText
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                Button(
-                    onClick = {
-                        viewModel.recordNewDonation()
-                        editLastDonation = "2026-06-12"
-                        Toast.makeText(context, "Donation record saved! Thank you, Hero!", Toast.LENGTH_LONG).show()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = BloodRed),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.testTag("increment_donation_btn")
-                ) {
-                    Icon(Icons.Filled.Add, "add")
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Record a Donation Today", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        if (finalUser.role == "Donor") {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = LightPinkRed),
+                border = BorderStroke(1.dp, CoralRed)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = "Did you donate blood recently? 🩸",
+                        fontWeight = FontWeight.Bold,
+                        color = DarkBloodRed,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "Increment your live counter to notify hospitals of availability dates.",
+                        fontSize = 12.sp,
+                        color = DarkText
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = {
+                            viewModel.recordNewDonation()
+                            editLastDonation = "2026-06-12"
+                            Toast.makeText(context, "Donation record saved! Thank you, Hero!", Toast.LENGTH_LONG).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = BloodRed),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("increment_donation_btn")
+                    ) {
+                        Icon(Icons.Filled.Add, "add")
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Record a Donation Today", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            }
+        } else {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF1F8E9)),
+                border = BorderStroke(1.dp, Color(0xFF8BC34A))
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = if (language == AppLanguage.BAN) "আপনার কি জরুরি রক্ত প্রয়োজন? 🩸" else "Do you need blood urgently? 🩸",
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF33691E),
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BAN) "একটি নতুন রক্তের রিকোয়েস্ট পোস্ট করুন এবং সরাসরি ডোনারদের সাথে যোগাযোগ করুন।" else "Post a new blood request and connect with active donors immediately.",
+                        fontSize = 12.sp,
+                        color = DarkText
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = {
+                            viewModel.navigateTo(AppScreen.REQUEST_BLOOD)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF558B2F)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("request_blood_quick_btn")
+                    ) {
+                        Icon(Icons.Filled.Add, "add")
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (language == AppLanguage.BAN) "রক্তের আবেদন করুন" else "Request Blood Now",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
         }
@@ -6789,31 +6913,33 @@ fun UserProfileScreen(viewModel: MainViewModel) {
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        if (finalUser.role == "Donor") {
+            Spacer(modifier = Modifier.height(10.dp))
 
-        OutlinedTextField(
-            value = editLastDonation,
-            onValueChange = { editLastDonation = it },
-            label = { Text("Last Donation Date") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("edit_last_donation_input"),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Switch to toggle active status
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(text = "Mark Me Available for Searches", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            Switch(
-                checked = editAvailable,
-                onCheckedChange = { editAvailable = it },
-                colors = SwitchDefaults.colors(checkedTrackColor = BloodRed)
+            OutlinedTextField(
+                value = editLastDonation,
+                onValueChange = { editLastDonation = it },
+                label = { Text("Last Donation Date") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("edit_last_donation_input"),
+                shape = RoundedCornerShape(12.dp)
             )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Switch to toggle active status
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(text = "Mark Me Available for Searches", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                Switch(
+                    checked = editAvailable,
+                    onCheckedChange = { editAvailable = it },
+                    colors = SwitchDefaults.colors(checkedTrackColor = BloodRed)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))

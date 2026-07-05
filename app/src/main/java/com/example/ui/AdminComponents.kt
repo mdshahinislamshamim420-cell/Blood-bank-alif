@@ -435,6 +435,21 @@ fun AdminDonorsTab(
                                         )
                                     }
                                 }
+
+                                Spacer(modifier = Modifier.width(6.dp))
+
+                                Box(
+                                    modifier = Modifier
+                                        .background(if (donor.role == "Requester") Color(0xFFE8F5E9).copy(alpha = 0.15f) else Color(0xFFECEFF1).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = if (donor.role == "Requester") "Seeker" else "Donor",
+                                        color = if (donor.role == "Requester") Color(0xFF81C784) else Color(0xFFB0BEC5),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(text = "User ID: ${donor.displayUserId}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AdminAccOrange)

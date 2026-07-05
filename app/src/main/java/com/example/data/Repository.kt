@@ -526,7 +526,8 @@ class BloodConnectRepository private constructor() {
         district: String,
         upazila: String,
         lastDonationDate: String,
-        country: String = "Bangladesh"
+        country: String = "Bangladesh",
+        role: String = "Donor"
     ) {
         val randId = "ABB-${(10000..99999).random()}"
         val newUser = BloodDonor(
@@ -542,7 +543,8 @@ class BloodConnectRepository private constructor() {
             isApproved = true, // Auto-approved for standard users, admin screen can still moderate!
             donationCount = 0,
             country = country,
-            userId = randId
+            userId = randId,
+            role = role
         )
         _currentUser.value = newUser
         _donors.value = _donors.value + newUser
@@ -584,7 +586,8 @@ class BloodConnectRepository private constructor() {
         upazila: String,
         lastDonation: String,
         available: Boolean,
-        country: String = "Bangladesh"
+        country: String = "Bangladesh",
+        role: String? = null
     ) {
         val current = _currentUser.value ?: return
         val updated = current.copy(
@@ -596,7 +599,8 @@ class BloodConnectRepository private constructor() {
             upazila = upazila,
             lastDonationDate = lastDonation,
             isAvailable = available,
-            country = country
+            country = country,
+            role = role ?: current.role
         )
         _currentUser.value = updated
         _donors.value = _donors.value.map { if (it.id == current.id) updated else it }
