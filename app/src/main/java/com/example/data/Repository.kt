@@ -393,16 +393,109 @@ class BloodConnectRepository private constructor() {
         }
     }
 
+    private var appContext: Context? = null
+
+    private val _remoteApiKey = MutableStateFlow("")
+    val remoteApiKey: StateFlow<String> = _remoteApiKey.asStateFlow()
+
+    private fun setCurrentUser(user: BloodDonor?) {
+        _currentUser.value = user
+        appContext?.let { saveUserSession(it, user) }
+    }
+
+    fun saveUserSession(context: Context, donor: BloodDonor?) {
+        val prefs = context.getSharedPreferences("blood_connect_prefs", Context.MODE_PRIVATE)
+        if (donor == null) {
+            prefs.edit().apply {
+                remove("user_session_id")
+                remove("user_session_name")
+                remove("user_session_bloodGroup")
+                remove("user_session_phone")
+                remove("user_session_email")
+                remove("user_session_district")
+                remove("user_session_upazila")
+                remove("user_session_lastDonationDate")
+                remove("user_session_isAvailable")
+                remove("user_session_isApproved")
+                remove("user_session_donationCount")
+                remove("user_session_isGoogleUser")
+                remove("user_session_country")
+                remove("user_session_userId")
+                remove("user_session_isWarning")
+                remove("user_session_warningReason")
+                remove("user_session_role")
+                apply()
+            }
+        } else {
+            prefs.edit().apply {
+                putString("user_session_id", donor.id)
+                putString("user_session_name", donor.name)
+                putString("user_session_bloodGroup", donor.bloodGroup)
+                putString("user_session_phone", donor.phone)
+                putString("user_session_email", donor.email)
+                putString("user_session_district", donor.district)
+                putString("user_session_upazila", donor.upazila)
+                putString("user_session_lastDonationDate", donor.lastDonationDate)
+                putBoolean("user_session_isAvailable", donor.isAvailable)
+                putBoolean("user_session_isApproved", donor.isApproved)
+                putInt("user_session_donationCount", donor.donationCount)
+                putBoolean("user_session_isGoogleUser", donor.isGoogleUser)
+                putString("user_session_country", donor.country)
+                putString("user_session_userId", donor.userId)
+                putBoolean("user_session_isWarning", donor.isWarning)
+                putString("user_session_warningReason", donor.warningReason)
+                putString("user_session_role", donor.role)
+                apply()
+            }
+        }
+    }
+
     fun initRemoteConfig(context: Context) {
+        appContext = context.applicationContext
         if (prefsInitialized) return
         val prefs = context.getSharedPreferences("blood_connect_prefs", Context.MODE_PRIVATE)
+        
+        // Load User Session
+        val savedUserId = prefs.getString("user_session_id", "") ?: ""
+        if (savedUserId.isNotBlank()) {
+            val loadedDonor = BloodDonor(
+                id = savedUserId,
+                name = prefs.getString("user_session_name", "") ?: "",
+                bloodGroup = prefs.getString("user_session_bloodGroup", "") ?: "",
+                phone = prefs.getString("user_session_phone", "") ?: "",
+                email = prefs.getString("user_session_email", "") ?: "",
+                district = prefs.getString("user_session_district", "") ?: "",
+                upazila = prefs.getString("user_session_upazila", "") ?: "",
+                lastDonationDate = prefs.getString("user_session_lastDonationDate", "Available") ?: "Available",
+                isAvailable = prefs.getBoolean("user_session_isAvailable", true),
+                isApproved = prefs.getBoolean("user_session_isApproved", true),
+                donationCount = prefs.getInt("user_session_donationCount", 0),
+                isGoogleUser = prefs.getBoolean("user_session_isGoogleUser", false),
+                country = prefs.getString("user_session_country", "Bangladesh") ?: "Bangladesh",
+                userId = prefs.getString("user_session_userId", "") ?: "",
+                isWarning = prefs.getBoolean("user_session_isWarning", false),
+                warningReason = prefs.getString("user_session_warningReason", "") ?: "",
+                role = prefs.getString("user_session_role", "Donor") ?: "Donor"
+            )
+            _currentUser.value = loadedDonor
+            
+            // Register in list
+            val exists = _donors.value.any { it.phone == loadedDonor.phone }
+            if (!exists) {
+                _donors.value = _donors.value + loadedDonor
+            }
+        }
+
         var savedUrl = prefs.getString("remote_api_url", "") ?: ""
+        var savedKey = prefs.getString("remote_api_key", "") ?: ""
+        _remoteApiKey.value = savedKey
+
         if (savedUrl.isBlank()) {
             savedUrl = "https://hpturyhypcplydvtslpq.supabase.co"
             prefs.edit().putString("remote_api_url", savedUrl).apply()
         }
         if (savedUrl.isNotBlank()) {
-            BloodConnectApiClient.updateBaseUrl(savedUrl)
+            BloodConnectApiClient.updateBaseUrl(savedUrl, savedKey)
             triggerRemoteSync()
         }
 
@@ -461,11 +554,16 @@ class BloodConnectRepository private constructor() {
         prefsInitialized = true
     }
 
-    fun updateRemoteApiUrl(context: Context, url: String): Boolean {
-        val success = BloodConnectApiClient.updateBaseUrl(url)
+    fun updateRemoteApiUrl(context: Context, url: String, apiKey: String): Boolean {
+        _remoteApiKey.value = apiKey
+        val success = BloodConnectApiClient.updateBaseUrl(url, apiKey)
         if (success) {
             val prefs = context.getSharedPreferences("blood_connect_prefs", Context.MODE_PRIVATE)
-            prefs.edit().putString("remote_api_url", url).apply()
+            prefs.edit().apply {
+                putString("remote_api_url", url)
+                putString("remote_api_key", apiKey)
+                apply()
+            }
             _syncError.value = null
             triggerRemoteSync()
         } else {
@@ -559,7 +657,7 @@ class BloodConnectRepository private constructor() {
         if (!isGoogle && email.equals("Alifsheenshopping@gmail.com", ignoreCase = true) && password == "019Alif11#") {
             val adminUser = _donors.value.find { it.email.equals(email, ignoreCase = true) }
             if (adminUser != null) {
-                _currentUser.value = adminUser
+                setCurrentUser(adminUser)
             } else {
                 val newAdmin = BloodDonor(
                     id = "u_alif_admin",
@@ -575,7 +673,7 @@ class BloodConnectRepository private constructor() {
                     donationCount = 10,
                     isGoogleUser = false
                 )
-                _currentUser.value = newAdmin
+                setCurrentUser(newAdmin)
                 _donors.value = _donors.value + newAdmin
             }
             return true
@@ -586,7 +684,7 @@ class BloodConnectRepository private constructor() {
             (username.isNotBlank() && it.phone == username) || (email.isNotBlank() && it.email.equals(email, ignoreCase = true))
         }
         if (existing != null) {
-            _currentUser.value = existing
+            setCurrentUser(existing)
             return true
         } else {
             if (isGoogle) {
@@ -605,7 +703,7 @@ class BloodConnectRepository private constructor() {
                     donationCount = 1,
                     isGoogleUser = true
                 )
-                _currentUser.value = newSimulatedUser
+                setCurrentUser(newSimulatedUser)
                 _donors.value = _donors.value + newSimulatedUser
                 return true
             }
@@ -641,7 +739,7 @@ class BloodConnectRepository private constructor() {
             userId = randId,
             role = role
         )
-        _currentUser.value = newUser
+        setCurrentUser(newUser)
         _donors.value = _donors.value + newUser
 
         // Post to remote API if configured
@@ -668,7 +766,7 @@ class BloodConnectRepository private constructor() {
     }
 
     fun logout() {
-        _currentUser.value = null
+        setCurrentUser(null)
     }
 
     // PROFILE ACTIONS
@@ -697,7 +795,7 @@ class BloodConnectRepository private constructor() {
             country = country,
             role = role ?: current.role
         )
-        _currentUser.value = updated
+        setCurrentUser(updated)
         _donors.value = _donors.value.map { if (it.id == current.id) updated else it }
 
         // Post profile update to remote API if configured
@@ -720,7 +818,7 @@ class BloodConnectRepository private constructor() {
             donationCount = current.donationCount + 1,
             lastDonationDate = "2026-06-12"
         )
-        _currentUser.value = updated
+        setCurrentUser(updated)
         _donors.value = _donors.value.map { if (it.id == current.id) updated else it }
     }
 
@@ -757,7 +855,7 @@ class BloodConnectRepository private constructor() {
             // Also update current logged in user if they are the donor!
             val currentLoggedIn = _currentUser.value
             if (currentLoggedIn != null && currentLoggedIn.phone == donorPhone) {
-                _currentUser.value = updatedDonor
+                setCurrentUser(updatedDonor)
             }
         }
         
@@ -1031,7 +1129,7 @@ class BloodConnectRepository private constructor() {
         }
         val current = _currentUser.value
         if (current != null && current.id == id) {
-            _currentUser.value = current.copy(isWarning = isWarning, warningReason = reason)
+            setCurrentUser(current.copy(isWarning = isWarning, warningReason = reason))
         }
     }
 

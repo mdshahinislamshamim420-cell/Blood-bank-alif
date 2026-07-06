@@ -208,9 +208,10 @@ class MainViewModel(
     val syncError: StateFlow<String?> = repository.syncError
     val apiUrl: StateFlow<String> = BloodConnectApiClient.apiUrl
     val isRemoteConnected: StateFlow<Boolean> = BloodConnectApiClient.isRemoteConnected
+    val remoteApiKey: StateFlow<String> = repository.remoteApiKey
 
-    fun updateRemoteApiUrl(context: android.content.Context, url: String): Boolean {
-        return repository.updateRemoteApiUrl(context, url)
+    fun updateRemoteApiUrl(context: android.content.Context, url: String, apiKey: String = ""): Boolean {
+        return repository.updateRemoteApiUrl(context, url, apiKey)
     }
 
     fun triggerRemoteSync() {
@@ -227,53 +228,89 @@ class MainViewModel(
     }
 
     fun detectUserLocation(context: android.content.Context) {
-        try {
-            repository.initRemoteConfig(context)
-            val locale = java.util.Locale.getDefault()
-            val systemCountryCode = locale.country ?: ""
-            val systemLanguage = locale.language ?: ""
-            
-            val tm = context.getSystemService(android.content.Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
-            val simCountry = tm?.simCountryIso ?: ""
-            val networkCountry = tm?.networkCountryIso ?: ""
-            
-            val isBDByLocale = systemCountryCode.equals("BD", ignoreCase = true) || systemLanguage.equals("bn", ignoreCase = true)
-            val isBDBySim = simCountry.equals("bd", ignoreCase = true) || networkCountry.equals("bd", ignoreCase = true)
-            val isBDByTimeZone = java.util.TimeZone.getDefault().id.contains("Dhaka", ignoreCase = true) || java.util.TimeZone.getDefault().rawOffset == 6 * 3600000
-            
-            val isFromBangladesh = isBDByLocale || isBDBySim || isBDByTimeZone
-            _isUserInBangladesh.value = isFromBangladesh
-            _isDeviceInBangladesh.value = isFromBangladesh
-            
-            if (isFromBangladesh) {
-                _detectedCountry.value = "Bangladesh"
-                _detectedCountryCode.value = "BD"
-                regCountry = "Bangladesh"
-                reqCountry = "Bangladesh"
-                profileEditCountry = "Bangladesh"
-                regDistrict = "Dhaka"
-                reqDistrict = "Dhaka"
-                repository.setLanguage(AppLanguage.BAN)
-            } else {
-                val countryName = if (systemCountryCode.isNotBlank()) locale.displayCountry else "International"
-                _detectedCountry.value = countryName
-                _detectedCountryCode.value = if (systemCountryCode.isNotBlank()) systemCountryCode.uppercase() else "GL"
-                regCountry = countryName
-                reqCountry = countryName
-                profileEditCountry = countryName
-                repository.setLanguage(AppLanguage.ENG)
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                repository.initRemoteConfig(context)
+            } catch (e: Exception) {}
+
+            var detectedCountryFromIp: String? = null
+            var detectedCodeFromIp: String? = null
+
+            // Try to detect by IP first (to respect VPN)
+            try {
+                val url = java.net.URL("https://ipapi.co/json/")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 4000
+                conn.readTimeout = 4000
+                conn.requestMethod = "GET"
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0")
+                if (conn.responseCode == 200) {
+                    val text = conn.inputStream.bufferedReader().use { it.readText() }
+                    val json = org.json.JSONObject(text)
+                    if (json.has("country_name") && json.has("country_code")) {
+                        detectedCountryFromIp = json.getString("country_name")
+                        detectedCodeFromIp = json.getString("country_code")
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore and fall back to locale/system info
             }
-        } catch (e: Exception) {
-            _isUserInBangladesh.value = true
-            _isDeviceInBangladesh.value = true
-            _detectedCountry.value = "Bangladesh"
-            _detectedCountryCode.value = "BD"
-            regCountry = "Bangladesh"
-            reqCountry = "Bangladesh"
-            profileEditCountry = "Bangladesh"
-            regDistrict = "Dhaka"
-            reqDistrict = "Dhaka"
-            repository.setLanguage(AppLanguage.BAN)
+
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                try {
+                    val locale = java.util.Locale.getDefault()
+                    val systemCountryCode = locale.country ?: ""
+                    val systemLanguage = locale.language ?: ""
+
+                    val tm = context.getSystemService(android.content.Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
+                    val simCountry = tm?.simCountryIso ?: ""
+                    val networkCountry = tm?.networkCountryIso ?: ""
+
+                    val isBDByLocale = systemCountryCode.equals("BD", ignoreCase = true) || systemLanguage.equals("bn", ignoreCase = true)
+                    val isBDBySim = simCountry.equals("bd", ignoreCase = true) || networkCountry.equals("bd", ignoreCase = true)
+                    val isBDByTimeZone = java.util.TimeZone.getDefault().id.contains("Dhaka", ignoreCase = true) || java.util.TimeZone.getDefault().rawOffset == 6 * 3600000
+
+                    val isFromBangladesh = if (detectedCountryFromIp != null) {
+                        detectedCountryFromIp.equals("Bangladesh", ignoreCase = true) || detectedCodeFromIp.equals("BD", ignoreCase = true)
+                    } else {
+                        isBDByLocale || isBDBySim || isBDByTimeZone
+                    }
+
+                    _isUserInBangladesh.value = isFromBangladesh
+                    _isDeviceInBangladesh.value = isFromBangladesh
+
+                    if (isFromBangladesh) {
+                        _detectedCountry.value = "Bangladesh"
+                        _detectedCountryCode.value = "BD"
+                        regCountry = "Bangladesh"
+                        reqCountry = "Bangladesh"
+                        profileEditCountry = "Bangladesh"
+                        regDistrict = "Dhaka"
+                        reqDistrict = "Dhaka"
+                        repository.setLanguage(AppLanguage.BAN)
+                    } else {
+                        val countryName = detectedCountryFromIp ?: if (systemCountryCode.isNotBlank()) locale.displayCountry else "International"
+                        val countryCode = detectedCodeFromIp ?: if (systemCountryCode.isNotBlank()) systemCountryCode.uppercase() else "GL"
+                        _detectedCountry.value = countryName
+                        _detectedCountryCode.value = countryCode
+                        regCountry = countryName
+                        reqCountry = countryName
+                        profileEditCountry = countryName
+                        repository.setLanguage(AppLanguage.ENG)
+                    }
+                } catch (e: Exception) {
+                    _isUserInBangladesh.value = true
+                    _isDeviceInBangladesh.value = true
+                    _detectedCountry.value = "Bangladesh"
+                    _detectedCountryCode.value = "BD"
+                    regCountry = "Bangladesh"
+                    reqCountry = "Bangladesh"
+                    profileEditCountry = "Bangladesh"
+                    regDistrict = "Dhaka"
+                    reqDistrict = "Dhaka"
+                    repository.setLanguage(AppLanguage.BAN)
+                }
+            }
         }
     }
 

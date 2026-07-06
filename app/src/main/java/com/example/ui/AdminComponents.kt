@@ -1933,10 +1933,12 @@ fun AdminSettingsTab(
             .verticalScroll(rememberScrollState())
     ) {
         val activeApiUrl by viewModel.apiUrl.collectAsState()
+        val activeApiKey by viewModel.remoteApiKey.collectAsState()
         val isRemoteConnected by viewModel.isRemoteConnected.collectAsState()
         val isSyncing by viewModel.isSyncing.collectAsState()
         val syncError by viewModel.syncError.collectAsState()
         var editApiUrl by remember(activeApiUrl) { mutableStateOf(activeApiUrl) }
+        var editApiKey by remember(activeApiKey) { mutableStateOf(activeApiKey) }
 
         // Cloud Web API Configuration Card (Admin Only)
         Card(
@@ -1992,16 +1994,35 @@ fun AdminSettingsTab(
                     )
                 )
 
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = editApiKey,
+                    onValueChange = { editApiKey = it },
+                    label = { Text(if (language == AppLanguage.ENG) "API Key / Auth Header (Optional)" else "এপিআই কী (ঐচ্ছিক)", color = AdminTextMuted, fontSize = 12.sp) },
+                    placeholder = { Text("Bearer ... / Supabase Anon Key", color = AdminTextMuted.copy(alpha = 0.5f)) },
+                    modifier = Modifier.fillMaxWidth().testTag("api_key_input_admin"),
+                    shape = RoundedCornerShape(8.dp),
+                    singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(color = AdminTextWhite),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AdminPrimaryBlue,
+                        unfocusedBorderColor = AdminBorder,
+                        focusedContainerColor = AdminDarkBg,
+                        unfocusedContainerColor = AdminDarkBg
+                    )
+                )
+
                 Spacer(modifier = Modifier.height(14.dp))
 
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Button(
                         onClick = {
-                            val success = viewModel.updateRemoteApiUrl(context, editApiUrl)
+                            val success = viewModel.updateRemoteApiUrl(context, editApiUrl, editApiKey)
                             if (success) {
                                 Toast.makeText(
                                     context,
-                                    if (language == AppLanguage.ENG) "API base URL updated successfully!" else "এপিআই ইউআরএল আপডেট সম্পন্ন হয়েছে!",
+                                    if (language == AppLanguage.ENG) "API settings updated successfully!" else "এপিআই সেটিংস আপডেট সম্পন্ন হয়েছে!",
                                     Toast.LENGTH_SHORT
                                 ).show()
                             } else {

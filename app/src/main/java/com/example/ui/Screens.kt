@@ -7147,9 +7147,6 @@ fun AdminDashboardScreen(viewModel: MainViewModel) {
     val novusHeaderBg = Color.White
     val novusBorder = Color(0xFFE5E7EB)
 
-    var showMenuDropdown by remember { mutableStateOf(false) }
-    var showExitDropdown by remember { mutableStateOf(false) }
-
     val adminMenus = listOf(
         Triple("DASHBOARD", if (language == AppLanguage.ENG) "Dashboard" else "ড্যাশবোর্ড", Icons.Default.Dashboard),
         Triple("DONORS", if (language == AppLanguage.ENG) "Donors List" else "রক্তদাতা তালিকা", Icons.Default.Person),
@@ -7161,79 +7158,160 @@ fun AdminDashboardScreen(viewModel: MainViewModel) {
     )
 
     val currentMenu = adminMenus.find { it.first == activeTab } ?: adminMenus[0]
-    val remainingMenus = adminMenus.filter { it.first != activeTab }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(novusBg)
-    ) {
-        // --- NEW DYNAMIC HEADER WITH DROPDOWN FOR REMAINING MENUS ---
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Brush.horizontalGradient(listOf(novusSidebarBg, novusSidebarDark)))
-                .height(64.dp)
-                .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Left: Exit Options & Title
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box {
-                    IconButton(
-                        onClick = { showExitDropdown = true },
-                        modifier = Modifier.size(36.dp).testTag("exit_admin_portal_btn")
-                    ) {
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                drawerContainerColor = Color(0xFF1E2230),
+                drawerContentColor = Color.White,
+                modifier = Modifier.width(280.dp)
+            ) {
+                // Header of Drawer
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Brush.horizontalGradient(listOf(novusSidebarBg, novusSidebarDark)))
+                        .padding(vertical = 24.dp, horizontal = 16.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Exit Options",
+                            imageVector = Icons.Default.AdminPanelSettings,
+                            contentDescription = "Admin Logo",
                             tint = Color.White,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(28.dp)
                         )
-                    }
-                    
-                    DropdownMenu(
-                        expanded = showExitDropdown,
-                        onDismissRequest = { showExitDropdown = false },
-                        modifier = Modifier
-                            .background(Color(0xFF1E2230)) // Dark Theme Matching
-                            .border(1.dp, Color(0xFF2C3248), RoundedCornerShape(8.dp))
-                    ) {
-                        DropdownMenuItem(
-                            text = { 
-                                Text(
-                                    text = if (language == AppLanguage.ENG) "Go to Home Screen" else "হোমে ফিরে যান",
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                ) 
-                            },
-                            onClick = {
-                                showExitDropdown = false
-                                viewModel.navigateTo(AppScreen.HOME)
-                            }
-                        )
-                        HorizontalDivider(color = Color(0xFF2C3248))
-                        DropdownMenuItem(
-                            text = { 
-                                Text(
-                                    text = if (language == AppLanguage.ENG) "Logout Admin" else "লগআউট করুন",
-                                    color = Color(0xFFEF4444),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                ) 
-                            },
-                            onClick = {
-                                showExitDropdown = false
-                                viewModel.triggerLogout()
-                                viewModel.navigateTo(AppScreen.HOME)
-                            }
-                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = if (language == AppLanguage.ENG) "Admin Panel" else "এডমিন প্যানেল",
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Alif Blood Bank",
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.width(4.dp))
-                Column {
+                Spacer(modifier = Modifier.height(12.dp))
+                // Navigation Drawer Items
+                adminMenus.forEach { (tag, label, icon) ->
+                    val isSelected = activeTab == tag
+                    NavigationDrawerItem(
+                        label = { 
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(label, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                val badgeValue = when (tag) {
+                                    "DONORS" -> "${donorsList.size}"
+                                    "REQUESTS" -> "${requestsList.filter { it.status == "Active" }.size}"
+                                    "REPORTS" -> "${scamReportsList.size}"
+                                    else -> null
+                                }
+                                if (badgeValue != null) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(if (isSelected) Color.White else novusSidebarBg, RoundedCornerShape(10.dp))
+                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = badgeValue,
+                                            color = if (isSelected) novusSidebarBg else Color.White,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        selected = isSelected,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            activeTab = tag
+                            filterStatus = "All"
+                        },
+                        icon = { Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        colors = NavigationDrawerItemDefaults.colors(
+                            selectedContainerColor = novusSidebarActive,
+                            selectedIconColor = Color.White,
+                            selectedTextColor = Color.White,
+                            unselectedContainerColor = Color.Transparent,
+                            unselectedIconColor = Color.White.copy(alpha = 0.7f),
+                            unselectedTextColor = Color.White.copy(alpha = 0.7f)
+                        ),
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                NavigationDrawerItem(
+                    label = { Text(if (language == AppLanguage.ENG) "Go to Home Screen" else "হোমে ফিরে যান", fontWeight = FontWeight.Medium, fontSize = 13.sp) },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        viewModel.navigateTo(AppScreen.HOME)
+                    },
+                    icon = { Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    colors = NavigationDrawerItemDefaults.colors(
+                        unselectedIconColor = Color.White.copy(alpha = 0.7f),
+                        unselectedTextColor = Color.White.copy(alpha = 0.7f)
+                    ),
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+                NavigationDrawerItem(
+                    label = { Text(if (language == AppLanguage.ENG) "Logout Admin" else "লগআউট করুন", fontWeight = FontWeight.Bold, color = Color(0xFFEF4444), fontSize = 13.sp) },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        viewModel.triggerLogout()
+                        viewModel.navigateTo(AppScreen.HOME)
+                    },
+                    icon = { Icon(imageVector = Icons.Filled.Logout, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(20.dp)) },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(novusBg)
+        ) {
+            // --- NEW DYNAMIC HEADER WITH DRAWER OPEN BUTTON ---
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Brush.horizontalGradient(listOf(novusSidebarBg, novusSidebarDark)))
+                    .height(64.dp)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Left: Open Drawer Icon & Title
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { scope.launch { drawerState.open() } },
+                        modifier = Modifier.size(40.dp).testTag("open_admin_drawer_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Open Sidebar Menu",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.AdminPanelSettings,
@@ -7251,180 +7329,87 @@ fun AdminDashboardScreen(viewModel: MainViewModel) {
                         )
                     }
                 }
-            }
 
-            // Center: ACTIVE MENU CHIP & DYNAMIC THREE-DOTS MENU
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Icon(
-                    imageVector = currentMenu.third,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = currentMenu.second,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                )
-
-                // Current menu badge value
-                val currentBadgeValue = when (currentMenu.first) {
-                    "DONORS" -> "${donorsList.size}"
-                    "REQUESTS" -> "${requestsList.filter { it.status == "Active" }.size}"
-                    "REPORTS" -> "${scamReportsList.size}"
-                    else -> null
-                }
-                if (currentBadgeValue != null) {
+                // Center: ACTIVE MENU CHIP DISPLAY
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        imageVector = currentMenu.third,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .background(Color(0xFFE53935), RoundedCornerShape(10.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = currentBadgeValue,
-                            color = Color.White,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Text(
+                        text = currentMenu.second,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+
+                    val currentBadgeValue = when (currentMenu.first) {
+                        "DONORS" -> "${donorsList.size}"
+                        "REQUESTS" -> "${requestsList.filter { it.status == "Active" }.size}"
+                        "REPORTS" -> "${scamReportsList.size}"
+                        else -> null
                     }
-                }
-
-                Spacer(modifier = Modifier.width(10.dp))
-                Box {
-                    IconButton(
-                        onClick = { showMenuDropdown = true },
-                        modifier = Modifier.size(24.dp).testTag("three_dots_menu_btn")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "More Menus",
-                            tint = Color.White
-                        )
-                    }
-
-                    // Dropdown for the remaining (inactive) menus
-                    DropdownMenu(
-                        expanded = showMenuDropdown,
-                        onDismissRequest = { showMenuDropdown = false },
-                        modifier = Modifier
-                            .background(Color(0xFF1E2230)) // Dark Theme Matching
-                            .border(1.dp, Color(0xFF2C3248), RoundedCornerShape(8.dp))
-                            .testTag("admin_more_dropdown")
-                    ) {
-                        Text(
-                            text = if (language == AppLanguage.ENG) "Switch Admin Section" else "অন্যান্য মেনুসমূহ",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF8F9BB3),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
-                        HorizontalDivider(color = Color(0xFF2C3248))
-
-                        remainingMenus.forEach { (tag, label, icon) ->
-                            val badgeValue = when (tag) {
-                                "DONORS" -> "${donorsList.size}"
-                                "REQUESTS" -> "${requestsList.filter { it.status == "Active" }.size}"
-                                "REPORTS" -> "${scamReportsList.size}"
-                                else -> null
-                            }
-                            val badgeColor = when (tag) {
-                                "DONORS" -> Color(0xFF00BCD4)
-                                "REQUESTS" -> Color(0xFF8BC34A)
-                                "REPORTS" -> Color(0xFFFF5722)
-                                else -> Color.Transparent
-                            }
-
-                            DropdownMenuItem(
-                                text = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Icon(
-                                            imageVector = icon,
-                                            contentDescription = null,
-                                            tint = Color.White.copy(alpha = 0.8f),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                        Text(
-                                            text = label,
-                                            color = Color.White,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        if (badgeValue != null) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .background(badgeColor, RoundedCornerShape(10.dp))
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                                            ) {
-                                                Text(
-                                                    text = badgeValue,
-                                                    color = Color.White,
-                                                    fontSize = 8.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-                                    }
-                                },
-                                onClick = {
-                                    activeTab = tag
-                                    filterStatus = "All"
-                                    showMenuDropdown = false
-                                }
+                    if (currentBadgeValue != null) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(Color(0xFFE53935), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = currentBadgeValue,
+                                color = Color.White,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
                 }
-            }
 
-            // Right: Interactive Search Input & Small Admin Avatar
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // Search box
-                Box(
-                    modifier = Modifier
-                        .width(120.dp)
-                        .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                // Right: Interactive Search Input & Small Admin Avatar
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Search, "search", tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(12.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        androidx.compose.foundation.text.BasicTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White),
-                            cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.White),
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                    // Search box
+                    Box(
+                        modifier = Modifier
+                            .width(120.dp)
+                            .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Search, "search", tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(12.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            androidx.compose.foundation.text.BasicTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White),
+                                cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.White),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+
+                    // Profile Badge
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .background(Color.White.copy(alpha = 0.2f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("A", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
-
-                // Profile Badge
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .background(Color.White.copy(alpha = 0.2f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("A", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                }
             }
-        }
 
         // --- 2. MAIN WORKSPACE CONTENT ---
         Box(
@@ -8076,6 +8061,7 @@ fun AdminDashboardScreen(viewModel: MainViewModel) {
             }
         }
     }
+}
 }
 
 
