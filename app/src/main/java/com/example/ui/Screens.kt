@@ -1509,90 +1509,29 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
 
             val isBD = regCountryInput.equals("Bangladesh", ignoreCase = true)
 
-            // Dynamic District / Upazila selectors based on country
             Row(modifier = Modifier.fillMaxWidth()) {
-                if (isBD) {
-                    // Bangladesh District selection dropdown
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedTextField(
-                            value = regDistrictInput,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text(strings["district_label"] ?: "District") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        Box(modifier = Modifier.matchParentSize().clickable { expandedDistrict = true })
-                        DropdownMenu(
-                            expanded = expandedDistrict,
-                            onDismissRequest = { expandedDistrict = false }
-                        ) {
-                            districts.forEach { dist ->
-                                DropdownMenuItem(
-                                    text = { Text(dist) },
-                                    onClick = {
-                                        regDistrictInput = dist
-                                        regUpazilaInput = ""
-                                        expandedDistrict = false
-                                    }
-                                )
-                            }
-                        }
-                    }
+                Box(modifier = Modifier.weight(1f)) {
+                    OutlinedTextField(
+                        value = regDistrictInput,
+                        onValueChange = { regDistrictInput = it },
+                        label = { Text(if (isBD) (strings["district_label"] ?: "District") else (strings["city_state_label"] ?: "City / State")) },
+                        placeholder = { Text(if (isBD) "e.g., Dhaka" else "e.g., New York") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
-                    // Bangladesh Upazila selection dropdown
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedTextField(
-                            value = regUpazilaInput,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text(strings["upazila_label"] ?: "Upazila") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        Box(modifier = Modifier.matchParentSize().clickable { expandedUpazila = true })
-                        DropdownMenu(
-                            expanded = expandedUpazila,
-                            onDismissRequest = { expandedUpazila = false }
-                        ) {
-                            availableUpazilas.forEach { upz ->
-                                DropdownMenuItem(
-                                    text = { Text(upz) },
-                                    onClick = {
-                                        regUpazilaInput = upz
-                                        expandedUpazila = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    // Foreign Country freeform text input
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedTextField(
-                            value = regDistrictInput,
-                            onValueChange = { regDistrictInput = it },
-                            label = { Text(strings["city_state_label"] ?: "City / State") },
-                            placeholder = { Text("e.g., New York") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedTextField(
-                            value = regUpazilaInput,
-                            onValueChange = { regUpazilaInput = it },
-                            label = { Text(if (language == AppLanguage.BAN) "অঞ্চল" else "Region") },
-                            placeholder = { Text("e.g., Queens") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                    }
+                Box(modifier = Modifier.weight(1f)) {
+                    OutlinedTextField(
+                        value = regUpazilaInput,
+                        onValueChange = { regUpazilaInput = it },
+                        label = { Text(if (isBD) (strings["upazila_label"] ?: "Upazila") else (if (language == AppLanguage.BAN) "অঞ্চল" else "Region")) },
+                        placeholder = { Text(if (isBD) "e.g., Mirpur" else "e.g., Queens") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
                 }
             }
 
@@ -1800,6 +1739,7 @@ fun HomeScreen(viewModel: MainViewModel) {
     }
 
     var showCountryChangeDialog by remember { mutableStateOf(false) }
+    var showSwitchWarningDialog by remember { mutableStateOf(false) }
     var isNoticeDismissed by rememberSaveable(homeNotice) { mutableStateOf(false) }
 
     if (showGiftPopup && popupNotice.isNotEmpty()) {
@@ -1867,6 +1807,120 @@ fun HomeScreen(viewModel: MainViewModel) {
             onDismissRequest = { showCountryChangeDialog = false },
             title = {
                 Text(
+                    text = if (isBn) "সার্ভার দেশ নির্বাচন করুন" else "Select Server Country",
+                    fontWeight = FontWeight.Bold,
+                    color = BloodRed,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = if (isBn) {
+                            "আইপি অনুযায়ী আপনার বর্তমান সার্ভার: $detectedCountry"
+                        } else {
+                            "Your current server based on IP: $detectedCountry"
+                        },
+                        fontSize = 13.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    
+                    val staticCountries = listOf(
+                        Pair("Bangladesh", "বাংলাদেশ"),
+                        Pair("India", "ভারত"),
+                        Pair("Saudi Arabia", "সৌদি আরব"),
+                        Pair("United Arab Emirates", "সংযুক্ত আরব আমিরাত"),
+                        Pair("United States", "যুক্তরাষ্ট্র"),
+                        Pair("United Kingdom", "যুক্তরাজ্য")
+                    )
+                    
+                    val allCountries = (staticCountries + quickCountries.map { Pair(it.first, it.second) }).distinctBy { it.first }
+                    
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 250.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        allCountries.forEach { (name, nativeName) ->
+                            val isCurrent = name.equals(detectedCountry, ignoreCase = true)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isCurrent) Color(0xFFFFEBEE) else Color.Transparent)
+                                    .clickable {
+                                        if (isCurrent) {
+                                            showCountryChangeDialog = false
+                                        } else {
+                                            showSwitchWarningDialog = true
+                                        }
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isCurrent,
+                                    onClick = {
+                                        if (isCurrent) {
+                                            showCountryChangeDialog = false
+                                        } else {
+                                            showSwitchWarningDialog = true
+                                        }
+                                    },
+                                    colors = RadioButtonDefaults.colors(selectedColor = BloodRed)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = name,
+                                        fontSize = 14.sp,
+                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isCurrent) BloodRed else Color.DarkGray
+                                    )
+                                    Text(
+                                        text = nativeName,
+                                        fontSize = 11.sp,
+                                        color = Color.Gray
+                                    )
+                                }
+                                if (isCurrent) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Text(
+                                        text = if (isBn) "সংযুক্ত (আইপি)" else "Connected (IP)",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF2E7D32),
+                                        modifier = Modifier
+                                            .background(Color(0xFFE8F5E9), RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showCountryChangeDialog = false }
+                ) {
+                    Text(if (isBn) "বন্ধ করুন" else "Close", color = Color.Gray)
+                }
+            }
+        )
+    }
+
+    if (showSwitchWarningDialog) {
+        val isBn = language == AppLanguage.BAN
+        AlertDialog(
+            onDismissRequest = { showSwitchWarningDialog = false },
+            title = {
+                Text(
                     text = if (isBn) "সার্ভার সংযোগ নোটিশ" else "Server Connection Notice",
                     fontWeight = FontWeight.Bold,
                     color = BloodRed,
@@ -1876,9 +1930,9 @@ fun HomeScreen(viewModel: MainViewModel) {
             text = {
                 Text(
                     text = if (isBn) {
-                        "আপনি যে দেশ থেকে অ্যাপটি ওপেন করেছেন, আপনার ডিভাইসটি স্বয়ংক্রিয়ভাবে সেই দেশের লোকাল ব্লাড ডাটাবেজ সার্ভারের সাথে সংযুক্ত হয়েছে। নিরাপত্তাজনিত কারণে আপনি অন্য দেশের সার্ভারে পরিবর্তন বা প্রবেশ করতে পারবেন না।"
+                        "আপনার ডিভাইসটি আইপি অনুযায়ী স্বয়ংক্রিয়ভাবে $detectedCountry সার্ভারে সংযুক্ত আছে। নিরাপত্তাজনিত কারণে অন্য সার্ভার নির্বাচন করা সম্ভব নয়।"
                     } else {
-                        "Your device has been automatically connected to the local blood database server for your region. For security reasons, switching or entering other country servers is not permitted."
+                        "Your device is automatically connected to the $detectedCountry server based on your IP. For security reasons, selecting other servers is not permitted."
                     },
                     fontSize = 14.sp,
                     color = Color.DarkGray
@@ -1886,7 +1940,10 @@ fun HomeScreen(viewModel: MainViewModel) {
             },
             confirmButton = {
                 TextButton(
-                    onClick = { showCountryChangeDialog = false },
+                    onClick = { 
+                        showSwitchWarningDialog = false 
+                        showCountryChangeDialog = false
+                    },
                     modifier = Modifier.testTag("ok_server_notice_btn")
                 ) {
                     Text(if (isBn) "ওকে" else "OK", color = BloodRed, fontWeight = FontWeight.Bold)
@@ -2601,8 +2658,12 @@ fun HomeScreen(viewModel: MainViewModel) {
                         LaunchedEffect(Unit) {
                             startCount = true
                         }
+                        val usersText = remember(animatedUsers) {
+                            val countVal = animatedUsers.toInt()
+                            if (countVal >= 1000) "${countVal / 1000}k" else countVal.toString()
+                        }
                         Text(
-                            text = java.text.NumberFormat.getIntegerInstance().format(animatedUsers.toInt()),
+                            text = usersText,
                             color = Color.White, // White text
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Black
@@ -2651,8 +2712,12 @@ fun HomeScreen(viewModel: MainViewModel) {
                         LaunchedEffect(Unit) {
                             startDonorCount = true
                         }
+                        val donorsText = remember(animatedDonors) {
+                            val countVal = animatedDonors.toInt()
+                            if (countVal >= 1000) "${countVal / 1000}k" else countVal.toString()
+                        }
                         Text(
-                            text = java.text.NumberFormat.getIntegerInstance().format(animatedDonors.toInt()),
+                            text = donorsText,
                             color = Color.White, // White text
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Black
@@ -2670,18 +2735,34 @@ fun HomeScreen(viewModel: MainViewModel) {
 
         // Custom CPA/Affiliate banner ad (Affmine, etc.)
         val customAdsEnabled by viewModel.customAdsEnabled.collectAsState()
-        val customAdTargetCountries by viewModel.customAdTargetCountries.collectAsState()
+        val customAdConfigs by viewModel.customAdConfigs.collectAsState()
 
-        val isAdAllowedInCountry = remember(customAdTargetCountries, detectedCountry) {
-            val countries = customAdTargetCountries.split(",").map { it.trim() }
-            countries.any { it.equals("All", ignoreCase = true) || it.equals(detectedCountry, ignoreCase = true) }
+        val activeAdsForCountry = remember(customAdConfigs, detectedCountry) {
+            customAdConfigs.filter { ad ->
+                val countries = ad.targetCountries.split(",").map { it.trim() }
+                countries.any { it.equals("All", ignoreCase = true) || it.equals(detectedCountry, ignoreCase = true) }
+            }
         }
 
-        if (customAdsEnabled && isAdAllowedInCountry) {
-            val customAdNetworkName by viewModel.customAdNetworkName.collectAsState()
-            val customAdTitle by viewModel.customAdTitle.collectAsState()
-            val customAdBannerUrl by viewModel.customAdBannerUrl.collectAsState()
-            val customAdTargetUrl by viewModel.customAdTargetUrl.collectAsState()
+        if (customAdsEnabled && activeAdsForCountry.isNotEmpty()) {
+            // Select one ad based on weights (using a random selection weighted by ad.weight)
+            val selectedAd = remember(activeAdsForCountry) {
+                val totalWeight = activeAdsForCountry.sumOf { it.weight.coerceAtLeast(1) }
+                if (totalWeight <= 0) {
+                    activeAdsForCountry.first()
+                } else {
+                    var randomVal = (1..totalWeight).random()
+                    var selected = activeAdsForCountry.first()
+                    for (ad in activeAdsForCountry) {
+                        randomVal -= ad.weight.coerceAtLeast(1)
+                        if (randomVal <= 0) {
+                            selected = ad
+                            break
+                        }
+                    }
+                    selected
+                }
+            }
 
             val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
 
@@ -2691,7 +2772,7 @@ fun HomeScreen(viewModel: MainViewModel) {
                     .padding(bottom = 16.dp)
                     .clickable {
                         try {
-                            uriHandler.openUri(customAdTargetUrl)
+                            uriHandler.openUri(selectedAd.targetUrl)
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
@@ -2720,7 +2801,7 @@ fun HomeScreen(viewModel: MainViewModel) {
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = customAdNetworkName.uppercase() + " SPONSORED",
+                                text = selectedAd.networkName.uppercase() + " SPONSORED",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = BloodRed
@@ -2737,19 +2818,53 @@ fun HomeScreen(viewModel: MainViewModel) {
                         )
                     }
 
-                    // Banner Image
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(130.dp)
-                            .background(Color.LightGray)
-                    ) {
-                        coil.compose.AsyncImage(
-                            model = customAdBannerUrl,
-                            contentDescription = "CPA Ad Offer",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                        )
+                    // Image or Video Banner
+                    if (selectedAd.isVideo && (selectedAd.videoUrl.isNotEmpty() || selectedAd.bannerUrl.isNotEmpty())) {
+                        val videoPath = if (selectedAd.videoUrl.isNotEmpty()) selectedAd.videoUrl else selectedAd.bannerUrl
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                                .background(Color.Black),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            androidx.compose.ui.viewinterop.AndroidView(
+                                factory = { ctx ->
+                                    android.widget.VideoView(ctx).apply {
+                                        try {
+                                            val uri = android.net.Uri.parse(videoPath)
+                                            setVideoURI(uri)
+                                            setOnPreparedListener { mp ->
+                                                mp.isLooping = true
+                                                mp.setVolume(0f, 0f) // Mute by default
+                                                mp.start()
+                                            }
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                        }
+                                        setOnErrorListener { _, _, _ ->
+                                            true // Prevent error dialog popup
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    } else {
+                        // Banner Image
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(130.dp)
+                                .background(Color.LightGray)
+                        ) {
+                            coil.compose.AsyncImage(
+                                model = selectedAd.bannerUrl,
+                                contentDescription = "CPA Ad Offer",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            )
+                        }
                     }
 
                     // Title and Description / Call-To-Action
@@ -2762,7 +2877,7 @@ fun HomeScreen(viewModel: MainViewModel) {
                     ) {
                         Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                             Text(
-                                text = customAdTitle,
+                                text = selectedAd.title,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = DarkText,
@@ -2770,7 +2885,7 @@ fun HomeScreen(viewModel: MainViewModel) {
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                             )
                             Text(
-                                text = customAdTargetUrl,
+                                text = selectedAd.targetUrl,
                                 fontSize = 10.sp,
                                 color = SecondaryText,
                                 maxLines = 1,
@@ -2781,7 +2896,7 @@ fun HomeScreen(viewModel: MainViewModel) {
                         Button(
                             onClick = {
                                 try {
-                                    uriHandler.openUri(customAdTargetUrl)
+                                    uriHandler.openUri(selectedAd.targetUrl)
                                 } catch (e: Exception) {
                                     e.printStackTrace()
                                 }
@@ -7033,6 +7148,7 @@ fun AdminDashboardScreen(viewModel: MainViewModel) {
     val novusBorder = Color(0xFFE5E7EB)
 
     var showMenuDropdown by remember { mutableStateOf(false) }
+    var showExitDropdown by remember { mutableStateOf(false) }
 
     val adminMenus = listOf(
         Triple("DASHBOARD", if (language == AppLanguage.ENG) "Dashboard" else "ড্যাশবোর্ড", Icons.Default.Dashboard),
@@ -7062,18 +7178,59 @@ fun AdminDashboardScreen(viewModel: MainViewModel) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Left: Logo & Exit button
+            // Left: Exit Options & Title
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = { viewModel.navigateTo(AppScreen.HOME) },
-                    modifier = Modifier.size(36.dp).testTag("exit_admin_portal_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Exit Portal",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
+                Box {
+                    IconButton(
+                        onClick = { showExitDropdown = true },
+                        modifier = Modifier.size(36.dp).testTag("exit_admin_portal_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Exit Options",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    
+                    DropdownMenu(
+                        expanded = showExitDropdown,
+                        onDismissRequest = { showExitDropdown = false },
+                        modifier = Modifier
+                            .background(Color(0xFF1E2230)) // Dark Theme Matching
+                            .border(1.dp, Color(0xFF2C3248), RoundedCornerShape(8.dp))
+                    ) {
+                        DropdownMenuItem(
+                            text = { 
+                                Text(
+                                    text = if (language == AppLanguage.ENG) "Go to Home Screen" else "হোমে ফিরে যান",
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                ) 
+                            },
+                            onClick = {
+                                showExitDropdown = false
+                                viewModel.navigateTo(AppScreen.HOME)
+                            }
+                        )
+                        HorizontalDivider(color = Color(0xFF2C3248))
+                        DropdownMenuItem(
+                            text = { 
+                                Text(
+                                    text = if (language == AppLanguage.ENG) "Logout Admin" else "লগআউট করুন",
+                                    color = Color(0xFFEF4444),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                ) 
+                            },
+                            onClick = {
+                                showExitDropdown = false
+                                viewModel.triggerLogout()
+                                viewModel.navigateTo(AppScreen.HOME)
+                            }
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Column {
@@ -7086,19 +7243,13 @@ fun AdminDashboardScreen(viewModel: MainViewModel) {
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "NOVUS",
+                            text = if (language == AppLanguage.ENG) "Admin Panel" else "এডমিন প্যানেল",
                             fontSize = 15.sp,
-                            fontWeight = FontWeight.Black,
+                            fontWeight = FontWeight.Bold,
                             color = Color.White,
                             letterSpacing = 0.5.sp
                         )
                     }
-                    Text(
-                        text = if (language == AppLanguage.ENG) "Admin Panel" else "এডমিন প্যানেল",
-                        fontSize = 8.sp,
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontWeight = FontWeight.Bold
-                    )
                 }
             }
 
@@ -8740,6 +8891,8 @@ fun ChatRoomScreen(viewModel: MainViewModel) {
 fun RequestDetailScreen(viewModel: MainViewModel) {
     val req by viewModel.selectedRequest.collectAsState()
     val language by viewModel.language.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
+    val claims by viewModel.donationClaims.collectAsState()
     val context = LocalContext.current
 
     if (req == null) {
@@ -8945,6 +9098,182 @@ fun RequestDetailScreen(viewModel: MainViewModel) {
                 Icon(Icons.Default.Chat, contentDescription = null)
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(text = if (language == AppLanguage.BAN) "চ্যাট" else "Chat", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+
+            val isRequestOwner = currentUser?.phone == request.contactNumber
+            val requestClaims = claims.filter { it.requestId == request.id }
+
+            if (isRequestOwner) {
+                val pendingClaims = requestClaims.filter { it.status == "Pending" }
+                val acceptedClaims = requestClaims.filter { it.status == "Accepted" }
+                
+                if (pendingClaims.isNotEmpty() || acceptedClaims.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFBE9E7)),
+                        border = BorderStroke(1.dp, Color(0xFFFFCCBC))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = if (language == AppLanguage.BAN) "রক্তদানকারী কনফার্মেশন অনুরোধ" else "Donation Confirmation Requests",
+                                fontWeight = FontWeight.Bold,
+                                color = BloodRed,
+                                fontSize = 15.sp,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            
+                            pendingClaims.forEach { claim ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = PureWhite),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text(text = claim.donorName, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DarkText)
+                                        Text(text = claim.donorPhone, fontSize = 12.sp, color = Color.Gray)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Button(
+                                                onClick = { viewModel.acceptDonationClaim(claim.id) },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                                                modifier = Modifier.weight(1f).height(36.dp),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(0.dp)
+                                            ) {
+                                                Text(text = if (language == AppLanguage.BAN) "হ্যাঁ, রক্ত দিয়েছেন" else "Yes, Donated", fontSize = 12.sp, color = Color.White)
+                                            }
+                                            Button(
+                                                onClick = { viewModel.rejectDonationClaim(claim.id) },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                                                modifier = Modifier.weight(1f).height(36.dp),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(0.dp)
+                                            ) {
+                                                Text(text = if (language == AppLanguage.BAN) "বাতিল" else "Reject", fontSize = 12.sp, color = Color.White)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            acceptedClaims.forEach { claim ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(text = claim.donorName, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF2E7D32))
+                                            Text(text = if (language == AppLanguage.BAN) "রক্তদান কনফার্ম করা হয়েছে!" else "Donation confirmed!", fontSize = 12.sp, color = Color(0xFF2E7D32))
+                                        }
+                                        Icon(Icons.Filled.CheckCircle, contentDescription = "Confirmed", tint = Color(0xFF2E7D32))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Potential donor view
+                val myClaim = requestClaims.find { it.donorPhone == currentUser?.phone }
+                if (myClaim == null) {
+                    if (currentUser != null) {
+                        Button(
+                            onClick = {
+                                viewModel.submitDonationClaim(
+                                    requestId = request.id,
+                                    donorPhone = currentUser!!.phone,
+                                    donorName = currentUser!!.name,
+                                    contactNumber = request.contactNumber
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth().height(56.dp).padding(top = 8.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800))
+                        ) {
+                            Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(text = if (language == AppLanguage.BAN) "আমি রক্ত দিয়েছি" else "I have donated blood", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    } else {
+                        // User not logged in, prompt to log in to report blood donation
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0)),
+                            border = BorderStroke(1.dp, Color(0xFFFFE0B2))
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BAN) "আপনি রক্ত দিয়ে থাকলে তা কনফার্ম করতে অ্যাকাউন্ট লগইন করুন।" else "Please log in to report and confirm if you have donated blood.",
+                                modifier = Modifier.padding(12.dp),
+                                fontSize = 13.sp,
+                                color = Color(0xFFE65100),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                } else {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = when (myClaim.status) {
+                                "Accepted" -> Color(0xFFE8F5E9)
+                                "Rejected" -> Color(0xFFFFEBEE)
+                                else -> Color(0xFFFFF3E0)
+                            }
+                        ),
+                        border = BorderStroke(1.dp, when (myClaim.status) {
+                            "Accepted" -> Color(0xFFA5D6A7)
+                            "Rejected" -> Color(0xFFEF9A9A)
+                            else -> Color(0xFFFFCC80)
+                        })
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = when (myClaim.status) {
+                                    "Accepted" -> Icons.Filled.CheckCircle
+                                    "Rejected" -> Icons.Filled.Cancel
+                                    else -> Icons.Filled.Info
+                                },
+                                contentDescription = null,
+                                tint = when (myClaim.status) {
+                                    "Accepted" -> Color(0xFF2E7D32)
+                                    "Rejected" -> Color(0xFFC62828)
+                                    else -> Color(0xFFEF6C00)
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = when (myClaim.status) {
+                                    "Accepted" -> if (language == AppLanguage.BAN) "আপনার রক্তদান কনফার্ম করা হয়েছে! আপনার প্রোফাইলে ডোনেশন সংখ্যা যোগ হয়েছে।" else "Your donation is confirmed! It has been added to your profile count."
+                                    "Rejected" -> if (language == AppLanguage.BAN) "রক্তদান কনফার্মেশন অনুরোধ বাতিল করা হয়েছে।" else "Donation confirmation request was rejected."
+                                    else -> if (language == AppLanguage.BAN) "রক্তদান কনফার্মেশনের আবেদন অপেক্ষমাণ। ব্যবহারকারী গ্রহণ করলে আপনার প্রোফাইলে তথ্যটি শো করবে।" else "Donation request is pending verification. Once accepted, it will show on your profile."
+                                },
+                                fontSize = 14.sp,
+                                color = when (myClaim.status) {
+                                    "Accepted" -> Color(0xFF2E7D32)
+                                    "Rejected" -> Color(0xFFC62828)
+                                    else -> Color(0xFFEF6C00)
+                                },
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -9158,10 +9487,18 @@ fun AmbulanceListScreen(viewModel: MainViewModel) {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(filteredAmbulances) { amb ->
-                        AmbulanceCard(amb, strings, language) {
-                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${amb.phone}"))
-                            context.startActivity(intent)
-                        }
+                        AmbulanceCard(
+                            ambulance = amb,
+                            strings = strings,
+                            language = language,
+                            onCall = {
+                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${amb.phone}"))
+                                context.startActivity(intent)
+                            },
+                            onChat = {
+                                viewModel.openChatRoom(amb.phone, amb.serviceName)
+                            }
+                        )
                     }
                 }
             }
@@ -9170,7 +9507,13 @@ fun AmbulanceListScreen(viewModel: MainViewModel) {
 }
 
 @Composable
-fun AmbulanceCard(ambulance: Ambulance, strings: Map<String, String>, language: AppLanguage, onCall: () -> Unit) {
+fun AmbulanceCard(
+    ambulance: Ambulance,
+    strings: Map<String, String>,
+    language: AppLanguage,
+    onCall: () -> Unit,
+    onChat: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -9239,15 +9582,40 @@ fun AmbulanceCard(ambulance: Ambulance, strings: Map<String, String>, language: 
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            Button(
-                onClick = onCall,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3))
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Call, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = strings["ambulance_call_btn"] ?: "Call Service", fontWeight = FontWeight.Bold)
+                Button(
+                    onClick = onCall,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3))
+                ) {
+                    Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = strings["ambulance_call_btn"] ?: "Call Service",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+
+                Button(
+                    onClick = onChat,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = BloodRed)
+                ) {
+                    Icon(Icons.Default.Forum, contentDescription = "Chat", tint = Color.White, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (language == AppLanguage.BAN) "চ্যাট করুন" else "In-App Chat",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = Color.White
+                    )
+                }
             }
         }
     }

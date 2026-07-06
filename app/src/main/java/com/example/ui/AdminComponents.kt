@@ -30,6 +30,10 @@ import com.example.data.AppLanguage
 import com.example.data.BloodDonor
 import com.example.data.BloodRequest
 import com.example.data.ScamReport
+import com.example.data.CustomAdConfig
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
 
 // Design System Colors for Admin Dark Theme
 val AdminDarkBg = Color(0xFF0F121D)
@@ -2590,18 +2594,33 @@ fun AdminSettingsTab(
 
         // Custom CPA/Affiliate Ads Config Card (Affmine, CPA, Banner Network)
         val customAdsEnabledState by viewModel.customAdsEnabled.collectAsState()
-        val customAdNetworkNameState by viewModel.customAdNetworkName.collectAsState()
-        val customAdTitleState by viewModel.customAdTitle.collectAsState()
-        val customAdBannerUrlState by viewModel.customAdBannerUrl.collectAsState()
-        val customAdTargetUrlState by viewModel.customAdTargetUrl.collectAsState()
-        val customAdTargetCountriesState by viewModel.customAdTargetCountries.collectAsState()
+        val customAdConfigsState by viewModel.customAdConfigs.collectAsState()
 
         var draftCustomAdsEnabled by remember { mutableStateOf(customAdsEnabledState) }
-        var draftCustomAdNetworkName by remember { mutableStateOf(customAdNetworkNameState) }
-        var draftCustomAdTitle by remember { mutableStateOf(customAdTitleState) }
-        var draftCustomAdBannerUrl by remember { mutableStateOf(customAdBannerUrlState) }
-        var draftCustomAdTargetUrl by remember { mutableStateOf(customAdTargetUrlState) }
-        var draftCustomAdTargetCountries by remember { mutableStateOf(customAdTargetCountriesState) }
+        var currentAdConfigsList by remember(customAdConfigsState) { mutableStateOf(customAdConfigsState) }
+
+        // State variables for adding a new ad config
+        var newAdNetworkName by remember { mutableStateOf("") }
+        var newAdTitle by remember { mutableStateOf("") }
+        var newAdWeight by remember { mutableStateOf("1") }
+        var newAdTargetUrl by remember { mutableStateOf("") }
+        var newAdTargetCountries by remember { mutableStateOf("All") }
+        
+        // Media upload mode state: "url" or "gallery"
+        var mediaSourceType by remember { mutableStateOf("url") } // "url" or "gallery"
+        var isVideoType by remember { mutableStateOf(false) } // true for video, false for image
+        var customMediaUrlInput by remember { mutableStateOf("") }
+        var selectedGalleryUri by remember { mutableStateOf<Uri?>(null) }
+
+        // Setup image/video picker launcher from gallery
+        val adMediaPickerLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent()
+        ) { uri: Uri? ->
+            if (uri != null) {
+                selectedGalleryUri = uri
+                mediaSourceType = "gallery"
+            }
+        }
 
         Card(
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
@@ -2618,7 +2637,7 @@ fun AdminSettingsTab(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = if (language == AppLanguage.ENG) "Add network banner ads & smart affiliate/CPA links (like Affmine, Adsterra, CPAgrip, etc.)" else "ব্যানার অ্যাড এবং স্মার্ট অ্যাফিলিয়েট/CPA লিংক (যেমন Affmine, Adsterra, CPAgrip ইত্যাদি) যুক্ত করুন",
+                    text = if (language == AppLanguage.ENG) "Add network banner ads, weights, and image/video uploads" else "বিজ্ঞাপন নেটওয়ার্ক, ওয়েট (Weight), এবং ইমেজ/ভিডিও গ্যালারি আপলোড যুক্ত করুন",
                     fontSize = 11.sp,
                     color = AdminTextMuted
                 )
@@ -2655,10 +2674,121 @@ fun AdminSettingsTab(
                 if (draftCustomAdsEnabled) {
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    Text(if (language == AppLanguage.ENG) "Ad Network Name" else "বিজ্ঞাপন নেটওয়ার্কের নাম", fontSize = 11.sp, color = AdminTextMuted)
+                    // SECTION 1: LIST OF CURRENT NETWORKS
+                    Text(
+                        text = if (language == AppLanguage.ENG) "Active CPA Ad Networks" else "সক্রিয় CPA বিজ্ঞাপন নেটওয়ার্কসমূহ",
+                        fontWeight = FontWeight.Bold,
+                        color = AdminTextWhite,
+                        fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (currentAdConfigsList.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(AdminDarkBg, RoundedCornerShape(8.dp))
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.ENG) "No ad networks configured yet." else "কোনো বিজ্ঞাপন নেটওয়ার্ক যুক্ত করা হয়নি।",
+                                fontSize = 11.sp,
+                                color = AdminTextMuted
+                            )
+                        }
+                    } else {
+                        currentAdConfigsList.forEach { ad ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .background(AdminDarkBg.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                                    .border(1.dp, AdminBorder.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = ad.networkName,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            color = AdminAccGreen
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Weight: ${ad.weight}",
+                                            fontSize = 10.sp,
+                                            color = AdminAccOrange,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier
+                                                .background(AdminAccOrange.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (ad.isVideo) "Video" else "Image",
+                                            fontSize = 10.sp,
+                                            color = AdminPrimaryBlue,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier
+                                                .background(AdminPrimaryBlue.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = ad.title,
+                                        fontSize = 11.sp,
+                                        color = AdminTextWhite,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = ad.targetUrl,
+                                        fontSize = 9.sp,
+                                        color = AdminTextMuted,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        currentAdConfigsList = currentAdConfigsList.filter { it.id != ad.id }
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        tint = AdminAccRed,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = AdminBorder)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // SECTION 2: ADD NEW AD FORM
+                    Text(
+                        text = if (language == AppLanguage.ENG) "Add New Network / Offer" else "নতুন নেটওয়ার্ক / অফার যোগ করুন",
+                        fontWeight = FontWeight.Bold,
+                        color = AdminTextWhite,
+                        fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(if (language == AppLanguage.ENG) "Ad Network Name" else "বিজ্ঞাপন নেটওয়ার্কের নাম (যেমন: Affmine)", fontSize = 11.sp, color = AdminTextMuted)
                     OutlinedTextField(
-                        value = draftCustomAdNetworkName,
-                        onValueChange = { draftCustomAdNetworkName = it },
+                        value = newAdNetworkName,
+                        onValueChange = { newAdNetworkName = it },
+                        placeholder = { Text("e.g. Affmine", color = AdminTextMuted.copy(alpha = 0.5f), fontSize = 12.sp) },
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = AdminTextWhite),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AdminPrimaryBlue, unfocusedBorderColor = AdminBorder, focusedContainerColor = AdminDarkBg, unfocusedContainerColor = AdminDarkBg)
@@ -2668,8 +2798,9 @@ fun AdminSettingsTab(
 
                     Text(if (language == AppLanguage.ENG) "Promotional Title / Headline" else "প্রোমোশনাল শিরোনাম / হেডলাইন", fontSize = 11.sp, color = AdminTextMuted)
                     OutlinedTextField(
-                        value = draftCustomAdTitle,
-                        onValueChange = { draftCustomAdTitle = it },
+                        value = newAdTitle,
+                        onValueChange = { newAdTitle = it },
+                        placeholder = { Text("e.g. Join the best offer and earn!", color = AdminTextMuted.copy(alpha = 0.5f), fontSize = 12.sp) },
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = AdminTextWhite),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AdminPrimaryBlue, unfocusedBorderColor = AdminBorder, focusedContainerColor = AdminDarkBg, unfocusedContainerColor = AdminDarkBg)
@@ -2677,36 +2808,288 @@ fun AdminSettingsTab(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    Text(if (language == AppLanguage.ENG) "Banner Image Link URL" else "ব্যানার ইমেজ লিংক URL", fontSize = 11.sp, color = AdminTextMuted)
-                    OutlinedTextField(
-                        value = draftCustomAdBannerUrl,
-                        onValueChange = { draftCustomAdBannerUrl = it },
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = AdminTextWhite),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AdminPrimaryBlue, unfocusedBorderColor = AdminBorder, focusedContainerColor = AdminDarkBg, unfocusedContainerColor = AdminDarkBg)
-                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(if (language == AppLanguage.ENG) "Ad Rotation Weight / Priority" else "রোটেশন ওয়েট / অগ্রাধিকার (Weight)", fontSize = 11.sp, color = AdminTextMuted)
+                            OutlinedTextField(
+                                value = newAdWeight,
+                                onValueChange = { newAdWeight = it },
+                                placeholder = { Text("1", color = AdminTextMuted.copy(alpha = 0.5f), fontSize = 12.sp) },
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = AdminTextWhite),
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AdminPrimaryBlue, unfocusedBorderColor = AdminBorder, focusedContainerColor = AdminDarkBg, unfocusedContainerColor = AdminDarkBg)
+                            )
+                        }
+
+                        Column(modifier = Modifier.weight(1.2f)) {
+                            Text(if (language == AppLanguage.ENG) "Target Countries" else "টার্গেট দেশসমূহ", fontSize = 11.sp, color = AdminTextMuted)
+                            OutlinedTextField(
+                                value = newAdTargetCountries,
+                                onValueChange = { newAdTargetCountries = it },
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = AdminTextWhite),
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AdminPrimaryBlue, unfocusedBorderColor = AdminBorder, focusedContainerColor = AdminDarkBg, unfocusedContainerColor = AdminDarkBg)
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(if (language == AppLanguage.ENG) "Target CPA Redirect Link (Affiliate Link)" else "টার্গেট CPA রিডাইরেক্ট লিংক (অ্যাফিলিয়েট লিংক)", fontSize = 11.sp, color = AdminTextMuted)
                     OutlinedTextField(
-                        value = draftCustomAdTargetUrl,
-                        onValueChange = { draftCustomAdTargetUrl = it },
+                        value = newAdTargetUrl,
+                        onValueChange = { newAdTargetUrl = it },
+                        placeholder = { Text("https://...", color = AdminTextMuted.copy(alpha = 0.5f), fontSize = 12.sp) },
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = AdminTextWhite),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AdminPrimaryBlue, unfocusedBorderColor = AdminBorder, focusedContainerColor = AdminDarkBg, unfocusedContainerColor = AdminDarkBg)
                     )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // MEDIA TYPE SELECTOR: Image or Video
+                    Text(
+                        text = if (language == AppLanguage.ENG) "Select Banner Media Type" else "ব্যানার মিডিয়ার ধরণ নির্বাচন করুন",
+                        fontSize = 11.sp,
+                        color = AdminTextMuted,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { isVideoType = false },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (!isVideoType) AdminPrimaryBlue else AdminDarkBg
+                            ),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .border(1.dp, if (!isVideoType) AdminPrimaryBlue else AdminBorder, RoundedCornerShape(6.dp)),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Image,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (language == AppLanguage.ENG) "Image Banner" else "ছবি ব্যানার",
+                                fontSize = 11.sp,
+                                color = Color.White
+                            )
+                        }
+
+                        Button(
+                            onClick = { isVideoType = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isVideoType) AdminPrimaryBlue else AdminDarkBg
+                            ),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .border(1.dp, if (isVideoType) AdminPrimaryBlue else AdminBorder, RoundedCornerShape(6.dp)),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Videocam,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (language == AppLanguage.ENG) "Video Banner" else "ভিডিও ব্যানার",
+                                fontSize = 11.sp,
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // MEDIA SOURCE TYPE: URL or Gallery Upload
+                    Text(
+                        text = if (language == AppLanguage.ENG) "Media Source Option" else "মিডিয়া সোর্সের অপশন",
+                        fontSize = 11.sp,
+                        color = AdminTextMuted,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { mediaSourceType = "url" },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (mediaSourceType == "url") AdminPrimaryBlue else AdminDarkBg
+                            ),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .border(1.dp, if (mediaSourceType == "url") AdminPrimaryBlue else AdminBorder, RoundedCornerShape(6.dp)),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.ENG) "Enter custom URL" else "যেকোনো ইউআরএল দিন",
+                                fontSize = 11.sp,
+                                color = Color.White
+                            )
+                        }
+
+                        Button(
+                            onClick = { mediaSourceType = "gallery" },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (mediaSourceType == "gallery") AdminPrimaryBlue else AdminDarkBg
+                            ),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .border(1.dp, if (mediaSourceType == "gallery") AdminPrimaryBlue else AdminBorder, RoundedCornerShape(6.dp)),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudUpload,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (language == AppLanguage.ENG) "Gallery Upload" else "গ্যালারি থেকে আপলোড",
+                                fontSize = 11.sp,
+                                color = Color.White
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    Text(if (language == AppLanguage.ENG) "Target Countries (e.g. Bangladesh, India or 'All')" else "টার্গেট দেশসমূহ (যেমন Bangladesh, India অথবা 'All')", fontSize = 11.sp, color = AdminTextMuted)
-                    OutlinedTextField(
-                        value = draftCustomAdTargetCountries,
-                        onValueChange = { draftCustomAdTargetCountries = it },
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = AdminTextWhite),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AdminPrimaryBlue, unfocusedBorderColor = AdminBorder, focusedContainerColor = AdminDarkBg, unfocusedContainerColor = AdminDarkBg)
-                    )
+                    if (mediaSourceType == "url") {
+                        Text(if (language == AppLanguage.ENG) "Media URL" else "মিডিয়া ইউআরএল লিংক (ছবি বা ভিডিও লিংক)", fontSize = 11.sp, color = AdminTextMuted)
+                        OutlinedTextField(
+                            value = customMediaUrlInput,
+                            onValueChange = { customMediaUrlInput = it },
+                            placeholder = { Text("https://example.com/banner.jpg", color = AdminTextMuted.copy(alpha = 0.5f), fontSize = 12.sp) },
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = AdminTextWhite),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AdminPrimaryBlue, unfocusedBorderColor = AdminBorder, focusedContainerColor = AdminDarkBg, unfocusedContainerColor = AdminDarkBg)
+                        )
+                    } else {
+                        // Gallery selection button
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(AdminDarkBg, RoundedCornerShape(8.dp))
+                                .border(1.dp, AdminBorder, RoundedCornerShape(8.dp))
+                                .clickable {
+                                    val typeStr = if (isVideoType) "video/*" else "image/*"
+                                    adMediaPickerLauncher.launch(typeStr)
+                                }
+                                .padding(14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isVideoType) Icons.Default.Videocam else Icons.Default.Image,
+                                    contentDescription = null,
+                                    tint = AdminAccGreen,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (selectedGalleryUri == null) {
+                                        if (language == AppLanguage.ENG) "Click to Pick File from Gallery" else "গ্যালারি থেকে ফাইল নির্বাচন করতে ক্লিক করুন"
+                                    } else {
+                                        if (language == AppLanguage.ENG) "File Selected!" else "ফাইল সফলভাবে সিলেক্ট হয়েছে!"
+                                    },
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (selectedGalleryUri == null) AdminTextWhite else AdminAccGreen
+                                )
+                            }
+                        }
+
+                        if (selectedGalleryUri != null) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "URI: ${selectedGalleryUri.toString()}",
+                                fontSize = 9.sp,
+                                color = AdminTextMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // BUTTON TO ADD THIS NETWORK TO LIST (+)
+                    Button(
+                        onClick = {
+                            if (newAdNetworkName.isBlank() || newAdTitle.isBlank() || newAdTargetUrl.isBlank()) {
+                                Toast.makeText(context, "Please fill in Network Name, Title and Target Link!", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+
+                            val finalMediaUrl = if (mediaSourceType == "url") {
+                                customMediaUrlInput
+                            } else {
+                                selectedGalleryUri?.toString() ?: ""
+                            }
+
+                            if (finalMediaUrl.isBlank()) {
+                                Toast.makeText(context, "Please provide a media URL or select from gallery!", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+
+                            val weightVal = newAdWeight.toIntOrNull() ?: 1
+
+                            val newAd = CustomAdConfig(
+                                id = java.util.UUID.randomUUID().toString(),
+                                networkName = newAdNetworkName,
+                                title = newAdTitle,
+                                bannerUrl = if (isVideoType) "" else finalMediaUrl,
+                                isVideo = isVideoType,
+                                videoUrl = if (isVideoType) finalMediaUrl else "",
+                                targetUrl = newAdTargetUrl,
+                                targetCountries = newAdTargetCountries,
+                                weight = weightVal
+                            )
+
+                            currentAdConfigsList = currentAdConfigsList + newAd
+
+                            // Clear add form fields
+                            newAdNetworkName = ""
+                            newAdTitle = ""
+                            newAdWeight = "1"
+                            newAdTargetUrl = ""
+                            customMediaUrlInput = ""
+                            selectedGalleryUri = null
+                            Toast.makeText(context, "Ad added to list! Save settings below to apply.", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.fillMaxWidth().height(38.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AdminPrimaryBlue),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (language == AppLanguage.ENG) "Add Ad Network to List (+)" else "বিজ্ঞাপন নেটওয়ার্ক রোটেশন তালিকায় যোগ করুন (+)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = Color.White
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -2716,20 +3099,21 @@ fun AdminSettingsTab(
                         viewModel.updateCustomAdsConfig(
                             context,
                             draftCustomAdsEnabled,
-                            draftCustomAdNetworkName,
-                            draftCustomAdTitle,
-                            draftCustomAdBannerUrl,
-                            draftCustomAdTargetUrl,
-                            draftCustomAdTargetCountries
+                            if (currentAdConfigsList.isNotEmpty()) currentAdConfigsList.first().networkName else "Affmine",
+                            if (currentAdConfigsList.isNotEmpty()) currentAdConfigsList.first().title else "Earn with Affmine CPA Network!",
+                            if (currentAdConfigsList.isNotEmpty()) (if (currentAdConfigsList.first().isVideo) currentAdConfigsList.first().videoUrl else currentAdConfigsList.first().bannerUrl) else "",
+                            if (currentAdConfigsList.isNotEmpty()) currentAdConfigsList.first().targetUrl else "https://www.affmine.com",
+                            if (currentAdConfigsList.isNotEmpty()) currentAdConfigsList.first().targetCountries else "All"
                         )
-                        Toast.makeText(context, "Affiliate Ads Config Saved!", Toast.LENGTH_SHORT).show()
+                        viewModel.updateCustomAdConfigsList(context, currentAdConfigsList)
+                        Toast.makeText(context, "All Affiliate Ad Settings Saved Successfully!", Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.fillMaxWidth().height(42.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = AdminAccGreen),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = if (language == AppLanguage.ENG) "Save Ad Settings" else "বিজ্ঞাপন সেটিংস সেভ করুন",
+                        text = if (language == AppLanguage.ENG) "Save All CPA Ads Settings" else "সকল বিজ্ঞাপন রোটেশন সেটিংস সেভ করুন",
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
                     )

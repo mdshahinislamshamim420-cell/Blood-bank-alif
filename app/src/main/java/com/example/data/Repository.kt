@@ -55,6 +55,9 @@ class BloodConnectRepository private constructor() {
     private val _appName = MutableStateFlow("Alif Blood Bank")
     val appName: StateFlow<String> = _appName.asStateFlow()
 
+    private val _donationClaims = MutableStateFlow<List<DonationClaim>>(emptyList())
+    val donationClaims: StateFlow<List<DonationClaim>> = _donationClaims.asStateFlow()
+
     fun updateAppName(newName: String) {
         _appName.value = newName
     }
@@ -162,6 +165,67 @@ class BloodConnectRepository private constructor() {
 
     private val _customAdTargetCountries = MutableStateFlow("All")
     val customAdTargetCountries: StateFlow<String> = _customAdTargetCountries.asStateFlow()
+
+    private val _customAdConfigs = MutableStateFlow<List<CustomAdConfig>>(emptyList())
+    val customAdConfigs: StateFlow<List<CustomAdConfig>> = _customAdConfigs.asStateFlow()
+
+    private fun serializeAds(ads: List<CustomAdConfig>): String {
+        return ads.joinToString("||AD_SEP||") { ad ->
+            listOf(
+                ad.id,
+                ad.networkName,
+                ad.title,
+                ad.bannerUrl,
+                ad.isVideo.toString(),
+                ad.videoUrl,
+                ad.targetUrl,
+                ad.targetCountries,
+                ad.weight.toString()
+            ).joinToString("||FIELD_SEP||")
+        }
+    }
+
+    fun deserializeAds(serialized: String): List<CustomAdConfig> {
+        if (serialized.isEmpty()) return emptyList()
+        val list = mutableListOf<CustomAdConfig>()
+        val items = serialized.split("||AD_SEP||")
+        for (item in items) {
+            val parts = item.split("||FIELD_SEP||")
+            if (parts.size >= 8) {
+                list.add(
+                    CustomAdConfig(
+                        id = parts[0],
+                        networkName = parts[1],
+                        title = parts[2],
+                        bannerUrl = parts[3],
+                        isVideo = parts[4].toBoolean(),
+                        videoUrl = parts[5],
+                        targetUrl = parts[6],
+                        targetCountries = parts[7],
+                        weight = parts.getOrNull(8)?.toIntOrNull() ?: 1
+                    )
+                )
+            }
+        }
+        return list
+    }
+
+    fun updateCustomAdConfigsList(context: Context, list: List<CustomAdConfig>) {
+        _customAdConfigs.value = list
+        val serialized = serializeAds(list)
+        val prefs = context.getSharedPreferences("blood_connect_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("custom_ad_configs_list", serialized).apply()
+        
+        // Also update single ad variables to fallback to the first active ad, for compatibility
+        if (list.isNotEmpty()) {
+            val first = list.first()
+            _customAdNetworkName.value = first.networkName
+            _customAdTitle.value = first.title
+            _customAdBannerUrl.value = if (first.isVideo) first.videoUrl else first.bannerUrl
+            _customAdTargetUrl.value = first.targetUrl
+            _customAdTargetCountries.value = first.targetCountries
+        }
+    }
 
     fun updateCustomAdsConfig(
         context: Context,
@@ -373,6 +437,26 @@ class BloodConnectRepository private constructor() {
         _customAdBannerUrl.value = prefs.getString("custom_ad_banner_url", "https://images.unsplash.com/photo-1542744094-3a31f103e35f?auto=format&fit=crop&w=600&q=80") ?: "https://images.unsplash.com/photo-1542744094-3a31f103e35f?auto=format&fit=crop&w=600&q=80"
         _customAdTargetUrl.value = prefs.getString("custom_ad_target_url", "https://www.affmine.com") ?: "https://www.affmine.com"
         _customAdTargetCountries.value = prefs.getString("custom_ad_target_countries", "All") ?: "All"
+
+        val adsListStr = prefs.getString("custom_ad_configs_list", "") ?: ""
+        var loadedAdsList = deserializeAds(adsListStr)
+        if (loadedAdsList.isEmpty()) {
+            loadedAdsList = listOf(
+                CustomAdConfig(
+                    id = "default_affmine",
+                    networkName = _customAdNetworkName.value,
+                    title = _customAdTitle.value,
+                    bannerUrl = _customAdBannerUrl.value,
+                    isVideo = false,
+                    videoUrl = "",
+                    targetUrl = _customAdTargetUrl.value,
+                    targetCountries = _customAdTargetCountries.value,
+                    weight = 1
+                )
+            )
+            prefs.edit().putString("custom_ad_configs_list", serializeAds(loadedAdsList)).apply()
+        }
+        _customAdConfigs.value = loadedAdsList
 
         prefsInitialized = true
     }
@@ -638,6 +722,57 @@ class BloodConnectRepository private constructor() {
         )
         _currentUser.value = updated
         _donors.value = _donors.value.map { if (it.id == current.id) updated else it }
+    }
+
+    fun submitDonationClaim(requestId: String, donorPhone: String, donorName: String, contactNumber: String) {
+        val newClaim = DonationClaim(
+            id = "claim_${System.currentTimeMillis()}",
+            requestId = requestId,
+            donorPhone = donorPhone,
+            donorName = donorName,
+            contactNumber = contactNumber,
+            status = "Pending"
+        )
+        _donationClaims.value = _donationClaims.value + newClaim
+    }
+
+    fun acceptDonationClaim(claimId: String) {
+        val claims = _donationClaims.value
+        val claim = claims.find { it.id == claimId } ?: return
+        
+        // Mark claim as Accepted
+        _donationClaims.value = claims.map {
+            if (it.id == claimId) it.copy(status = "Accepted") else it
+        }
+        
+        // Find donor by phone and increment donation count
+        val donorPhone = claim.donorPhone
+        val currentDonors = _donors.value
+        val donor = currentDonors.find { it.phone == donorPhone }
+        if (donor != null) {
+            val updatedDonor = donor.copy(donationCount = donor.donationCount + 1)
+            _donors.value = currentDonors.map {
+                if (it.phone == donorPhone) updatedDonor else it
+            }
+            // Also update current logged in user if they are the donor!
+            val currentLoggedIn = _currentUser.value
+            if (currentLoggedIn != null && currentLoggedIn.phone == donorPhone) {
+                _currentUser.value = updatedDonor
+            }
+        }
+        
+        // Mark blood request as completed
+        val currentRequests = _requests.value
+        _requests.value = currentRequests.map {
+            if (it.id == claim.requestId) it.copy(status = "Completed") else it
+        }
+    }
+
+    fun rejectDonationClaim(claimId: String) {
+        val claims = _donationClaims.value
+        _donationClaims.value = claims.map {
+            if (it.id == claimId) it.copy(status = "Rejected") else it
+        }
     }
 
     // REQUEST ACTIONS

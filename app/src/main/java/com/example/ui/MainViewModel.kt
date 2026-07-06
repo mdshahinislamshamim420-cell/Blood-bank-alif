@@ -96,6 +96,7 @@ class MainViewModel(
 
     val language: StateFlow<AppLanguage> = repository.language
     val appName: StateFlow<String> = repository.appName
+    val donationClaims: StateFlow<List<com.example.data.DonationClaim>> = repository.donationClaims
     val homeNotice: StateFlow<String> = repository.homeNotice
     val popupNotice: StateFlow<String> = repository.popupNotice
 
@@ -121,6 +122,11 @@ class MainViewModel(
     val customAdBannerUrl: StateFlow<String> = repository.customAdBannerUrl
     val customAdTargetUrl: StateFlow<String> = repository.customAdTargetUrl
     val customAdTargetCountries: StateFlow<String> = repository.customAdTargetCountries
+    val customAdConfigs: StateFlow<List<CustomAdConfig>> = repository.customAdConfigs
+
+    fun updateCustomAdConfigsList(context: android.content.Context, list: List<CustomAdConfig>) {
+        repository.updateCustomAdConfigsList(context, list)
+    }
 
     fun updateCustomAdsConfig(
         context: android.content.Context,
@@ -604,6 +610,18 @@ class MainViewModel(
         if (user != null) {
             seedProfileForm(user)
         }
+    }
+
+    fun submitDonationClaim(requestId: String, donorPhone: String, donorName: String, contactNumber: String) {
+        repository.submitDonationClaim(requestId, donorPhone, donorName, contactNumber)
+    }
+
+    fun acceptDonationClaim(claimId: String) {
+        repository.acceptDonationClaim(claimId)
+    }
+
+    fun rejectDonationClaim(claimId: String) {
+        repository.rejectDonationClaim(claimId)
     }
 
     fun triggerLogout() {

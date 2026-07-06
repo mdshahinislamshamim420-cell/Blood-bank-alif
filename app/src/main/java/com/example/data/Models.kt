@@ -46,6 +46,15 @@ data class BloodRequest(
     val medicalCondition: String = ""
 )
 
+data class DonationClaim(
+    val id: String,
+    val requestId: String,
+    val donorPhone: String,
+    val donorName: String,
+    val contactNumber: String, // request owner's phone
+    val status: String = "Pending" // Pending, Accepted, Rejected
+)
+
 data class DonationNotification(
     val id: String,
     val titleEn: String,
@@ -56,6 +65,18 @@ data class DonationNotification(
     val isRead: Boolean = false,
     val type: String = "ALERT", // ALERT, REQUEST, SUCCESS
     val country: String = "Bangladesh"
+)
+
+data class CustomAdConfig(
+    val id: String,
+    val networkName: String,
+    val title: String,
+    val bannerUrl: String,      // Image URL or local Uri path
+    val isVideo: Boolean = false,
+    val videoUrl: String = "",   // Video URL or local Uri path
+    val targetUrl: String,
+    val targetCountries: String = "All",
+    val weight: Int = 1         // Display rotation weight / weight priority
 )
 
 data class ScamReport(
