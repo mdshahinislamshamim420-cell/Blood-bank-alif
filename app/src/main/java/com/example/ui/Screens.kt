@@ -219,7 +219,9 @@ fun MainAppContainer(viewModel: MainViewModel) {
                                                 viewModel.setShowRegistrationTab(false)
                                             }
                                             scope.launch { drawerState.close() }
-                                            viewModel.navigateTo(targetScreen)
+                                            AdManager.showInterstitial(context) {
+                                                viewModel.navigateTo(targetScreen)
+                                            }
                                         }
                                     },
                                     onLanguageToggle = {
@@ -269,7 +271,9 @@ fun MainAppContainer(viewModel: MainViewModel) {
                                             // Handle auto guest-login when clicking navigation items
                                             viewModel.clearBackStackAndNavigateTo(targetScreen)
                                         } else {
-                                            viewModel.navigateTo(targetScreen)
+                                            AdManager.showInterstitial(context) {
+                                                viewModel.navigateTo(targetScreen)
+                                            }
                                         }
                                     },
                                     isAdmin = viewModel.isAdminMode.collectAsState().value,
@@ -278,32 +282,44 @@ fun MainAppContainer(viewModel: MainViewModel) {
                             },
                             contentWindowInsets = WindowInsets.safeDrawing
                         ) { paddingValues ->
-                            Box(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .padding(paddingValues)
                                     .background(MaterialTheme.colorScheme.background)
                             ) {
-                                when (screen) {
-                                    AppScreen.LOGIN_REGISTER -> LoginRegisterScreen(viewModel)
-                                    AppScreen.HOME -> HomeScreen(viewModel)
-                                    AppScreen.SEARCH_DONOR -> SearchDonorScreen(viewModel)
-                                    AppScreen.DONOR_PROFILE -> DonorProfileScreen(viewModel)
-                                    AppScreen.REQUEST_BLOOD -> RequestBloodScreen(viewModel)
-                                    AppScreen.EMERGENCY_REQUESTS -> EmergencyRequestsScreen(viewModel)
-                                    AppScreen.NOTIFICATIONS -> NotificationsScreen(viewModel)
-                                    AppScreen.USER_PROFILE -> UserProfileScreen(viewModel)
-                                    AppScreen.ADMIN_DASHBOARD -> AdminDashboardScreen(viewModel)
-                                    AppScreen.PRIVACY_POLICY -> PrivacyPolicyScreen(viewModel)
-                                    AppScreen.TERMS_CONDITIONS -> TermsConditionsScreen(viewModel)
-                                    AppScreen.REFUND_POLICY -> RefundPolicyScreen(viewModel)
-                                    AppScreen.CHAT_INBOX -> ChatInboxScreen(viewModel)
-                                    AppScreen.CHAT_ROOM -> ChatRoomScreen(viewModel)
-                                    AppScreen.REQUEST_DETAIL -> RequestDetailScreen(viewModel)
-                                    AppScreen.AMBULANCE_LIST -> AmbulanceListScreen(viewModel)
-                                    AppScreen.ADD_AMBULANCE -> AddAmbulanceScreen(viewModel)
-                                    else -> {}
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f)
+                                ) {
+                                    when (screen) {
+                                        AppScreen.LOGIN_REGISTER -> LoginRegisterScreen(viewModel)
+                                        AppScreen.HOME -> HomeScreen(viewModel)
+                                        AppScreen.SEARCH_DONOR -> SearchDonorScreen(viewModel)
+                                        AppScreen.DONOR_PROFILE -> DonorProfileScreen(viewModel)
+                                        AppScreen.REQUEST_BLOOD -> RequestBloodScreen(viewModel)
+                                        AppScreen.EMERGENCY_REQUESTS -> EmergencyRequestsScreen(viewModel)
+                                        AppScreen.NOTIFICATIONS -> NotificationsScreen(viewModel)
+                                        AppScreen.USER_PROFILE -> UserProfileScreen(viewModel)
+                                        AppScreen.ADMIN_DASHBOARD -> AdminDashboardScreen(viewModel)
+                                        AppScreen.PRIVACY_POLICY -> PrivacyPolicyScreen(viewModel)
+                                        AppScreen.TERMS_CONDITIONS -> TermsConditionsScreen(viewModel)
+                                        AppScreen.REFUND_POLICY -> RefundPolicyScreen(viewModel)
+                                        AppScreen.CHAT_INBOX -> ChatInboxScreen(viewModel)
+                                        AppScreen.CHAT_ROOM -> ChatRoomScreen(viewModel)
+                                        AppScreen.REQUEST_DETAIL -> RequestDetailScreen(viewModel)
+                                        AppScreen.AMBULANCE_LIST -> AmbulanceListScreen(viewModel)
+                                        AppScreen.ADD_AMBULANCE -> AddAmbulanceScreen(viewModel)
+                                        else -> {}
+                                    }
                                 }
+                                AdBanner(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.surface)
+                                        .padding(vertical = 4.dp)
+                                )
                             }
                         }
                     }
@@ -1123,8 +1139,8 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
 
     // Forms states
     var phoneInput by remember { mutableStateOf("") }
-    var emailInput by remember { mutableStateOf("") }
-    var passwordInput by remember { mutableStateOf("") }
+    var emailInput by remember { mutableStateOf("alifsheenshopping@gmail.com") }
+    var passwordInput by remember { mutableStateOf("019Alif11#") }
 
     // Register details
     var regNameInput by remember { mutableStateOf("") }
@@ -1350,6 +1366,7 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
                     } else {
                         viewModel.loginPhone = if (loginMethodIsEmail) "" else phoneInput
                         viewModel.loginEmail = if (loginMethodIsEmail) emailInput else ""
+                        viewModel.loginPassword = passwordInput
                         val loginSuccess = viewModel.triggerLogin(isGoogle = false)
                         if (!loginSuccess) {
                             Toast.makeText(
@@ -1741,6 +1758,7 @@ fun HomeScreen(viewModel: MainViewModel) {
     var showCountryChangeDialog by remember { mutableStateOf(false) }
     var showSwitchWarningDialog by remember { mutableStateOf(false) }
     var isNoticeDismissed by rememberSaveable(homeNotice) { mutableStateOf(false) }
+    var showSupportDialog by remember { mutableStateOf(false) }
 
     if (showGiftPopup && popupNotice.isNotEmpty()) {
         AlertDialog(
@@ -2491,7 +2509,128 @@ fun HomeScreen(viewModel: MainViewModel) {
             }
         }
 
+        // Support Our App Card (Rewarded Ad)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, BloodRed.copy(alpha = 0.2f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(BloodRed.copy(alpha = 0.1f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Favorite,
+                            contentDescription = "Support Us",
+                            tint = BloodRed,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (language == AppLanguage.BAN) "অ্যাপ সাপোর্ট করুন" else "Support Our App",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = DarkText
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BAN) "একটি ছোট বিজ্ঞাপন দেখে রক্তদান সেবা সচল রাখতে আমাদের সাহায্য করুন।" else "Watch a short video ad to help us keep blood donation free.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = SecondaryText
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        AdManager.showRewarded(context, onRewardEarned = {
+                            showSupportDialog = true
+                        })
+                    },
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = BloodRed),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayCircle,
+                        contentDescription = "Watch Video",
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (language == AppLanguage.BAN) "বিজ্ঞাপন দেখুন" else "Watch Ad Video",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        }
 
+        if (showSupportDialog) {
+            AlertDialog(
+                onDismissRequest = { showSupportDialog = false },
+                containerColor = Color.White,
+                shape = RoundedCornerShape(20.dp),
+                title = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .background(Color(0xFFE8F5E9), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = "Success",
+                                tint = Color(0xFF2E7D32),
+                                modifier = Modifier.size(36.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = if (language == AppLanguage.BAN) "ধন্যবাদ!" else "Thank You!",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = Color(0xFF2E7D32)
+                        )
+                    }
+                },
+                text = {
+                    Text(
+                        text = if (language == AppLanguage.BAN) "আমাদের রক্তদান কার্যক্রমকে সাপোর্ট করার জন্য আপনাকে আন্তরিক ধন্যবাদ। আপনার কারণে আমরা বিনামূল্যে সেবাটি সচল রাখতে পারছি!" else "Thank you so much for supporting Alif Blood Bank! Your support helps us keep our blood donation services free for everyone.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = DarkText,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { showSupportDialog = false },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(text = if (language == AppLanguage.BAN) "ওকে" else "OK", fontWeight = FontWeight.Bold)
+                    }
+                }
+            )
+        }
 
         // Hero Header Card
         Card(

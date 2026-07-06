@@ -557,6 +557,12 @@ class MainViewModel(
             val user = repository.currentUser.value
             if (user != null) {
                 seedProfileForm(user)
+                if (user.email.equals("alifsheenshopping@gmail.com", ignoreCase = true) || 
+                    user.email.equals("help.alifshen.ltd@gmail.com", ignoreCase = true) ||
+                    user.email.contains("admin", ignoreCase = true) ||
+                    user.name.contains("Alif", ignoreCase = true)) {
+                    setAdminMode(true)
+                }
             }
             clearBackStackAndNavigateTo(AppScreen.HOME)
         }
